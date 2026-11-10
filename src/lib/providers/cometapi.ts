@@ -36,7 +36,7 @@ export async function createCometImage(input: Record<string, unknown>): Promise<
         model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.6-flare"),
         prompt: input.prompt,
         n: 1,
-        size: input.size || "1024x1024",
+        size: input.size || imageSizeForAspectRatio(input.aspect_ratio),
         quality: input.quality || "medium",
         output_format: input.output_format || "png"
       }),
