@@ -42,7 +42,7 @@ export async function createKieTask(type: "image" | "video", input: Record<strin
   if (type === "image") {
     payload.input = {
       prompt: input.prompt,
-      aspect_ratio: input.aspect_ratio || "auto",
+      aspect_ratio: input.aspect_ratio || "1:1",
       resolution: input.resolution || "1K",
       quality: input.quality || "medium",
       output_format: input.output_format || "png"
