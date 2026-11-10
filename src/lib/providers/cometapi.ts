@@ -33,7 +33,7 @@ export async function createCometImage(input: Record<string, unknown>): Promise<
       method: "POST",
       headers: { Authorization: "Bearer " + key.secret, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.5-flare"),
+        model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.6-flare"),
         prompt: input.prompt,
         n: 1,
         size: input.size || "1024x1024",
