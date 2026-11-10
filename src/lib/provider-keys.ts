@@ -6,20 +6,30 @@ import { decryptProviderSecret, encryptProviderSecret } from "@/lib/secret-crypt
 export type ProviderName = "kie" | "cometapi";
 export type ProviderKey = { id: string; provider: ProviderName; label: string; secret: string; status: string };
 
-export async function listProviderKeys(provider: ProviderName): Promise<ProviderKey[]> {
+async function seedEnvironmentKey(provider: ProviderName): Promise<void> {
   await ensureSchema();
+  const existing = await getDb().execute({ sql: "SELECT id FROM api_keys WHERE provider = ? LIMIT 1", args: [provider] });
+  if (existing.rows.length) return;
+  const secret = provider === "kie" ? process.env.KIE_API_KEY : process.env.COMETAPI_API_KEY;
+  if (!secret) return;
+  await getDb().execute({
+    sql: "INSERT OR IGNORE INTO api_keys (id, provider, label, secret, status) VALUES (?, ?, 'Environment key', ?, 'active')",
+    args: ["env-" + provider, provider, encryptProviderSecret(secret)]
+  });
+}
+
+export async function listProviderKeys(provider: ProviderName): Promise<ProviderKey[]> {
+  await seedEnvironmentKey(provider);
   const result = await getDb().execute({
-    sql: "SELECT id, provider, label, secret, status FROM api_keys WHERE provider = ? AND status != 'disabled' ORDER BY created_at ASC, id ASC",
+    sql: "SELECT id, provider, label, secret, status FROM api_keys WHERE provider = ? ORDER BY created_at ASC, id ASC",
     args: [provider]
   });
-  const keys = (result.rows as unknown as ProviderKey[]).map(key => ({ ...key, secret: decryptProviderSecret(key.secret) }));
-  if (keys.length) return keys;
-  const envSecret = provider === "kie" ? process.env.KIE_API_KEY : process.env.COMETAPI_API_KEY;
-  return envSecret ? [{ id: "env-" + provider, provider, label: "Environment key", secret: envSecret, status: "active" }] : [];
+  return (result.rows as unknown as ProviderKey[])
+    .filter(key => key.status !== "disabled")
+    .map(key => ({ ...key, secret: decryptProviderSecret(key.secret) }));
 }
 
 export async function markKeyStatus(key: ProviderKey, status: "active" | "exhausted" | "disabled"): Promise<void> {
-  if (key.id.startsWith("env-")) return;
   await ensureSchema();
   await getDb().execute({
     sql: "UPDATE api_keys SET status = ?, updated_at = datetime('now') WHERE id = ?",
@@ -42,12 +52,12 @@ export async function removeProviderKey(id: string): Promise<void> {
 }
 
 export async function providerKeySummary(): Promise<Array<{ id: string; provider: ProviderName; label: string; status: string; masked: string }>> {
-  await ensureSchema();
+  await Promise.all((["kie", "cometapi"] as const).map(seedEnvironmentKey));
   const result = await getDb().execute({
     sql: "SELECT id, provider, label, secret, status FROM api_keys ORDER BY created_at ASC, id ASC"
   });
   const rows = result.rows as unknown as ProviderKey[];
-  const output = rows.map(key => {
+  return rows.map(key => {
     let plain = "";
     try { plain = decryptProviderSecret(key.secret); } catch { plain = ""; }
     return {
@@ -55,11 +65,4 @@ export async function providerKeySummary(): Promise<Array<{ id: string; provider
       masked: plain.length > 8 ? plain.slice(0, 3) + "••••••" + plain.slice(-3) : "••••••••"
     };
   });
-  for (const provider of ["kie", "cometapi"] as const) {
-    if (!rows.some(row => row.provider === provider)) {
-      const secret = provider === "kie" ? process.env.KIE_API_KEY : process.env.COMETAPI_API_KEY;
-      if (secret) output.push({ id: "env-" + provider, provider, label: "Environment key", status: "active", masked: "••••••••" });
-    }
-  }
-  return output;
 }
