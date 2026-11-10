@@ -21,3 +21,11 @@ jobs:
           TURSO_DATABASE_URL: file:./ci.db
           TURSO_AUTH_TOKEN: ci-placeholder
           MCP_AUTH_TOKEN: ci-placeholder
+      - name: MCP protocol smoke test
+        run: |
+          npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/next-start.log 2>&1 &
+          node scripts/mcp-smoke.mjs
+        env:
+          TURSO_DATABASE_URL: file:./ci.db
+          TURSO_AUTH_TOKEN: ci-placeholder
+          MCP_AUTH_TOKEN: ci-placeholder
