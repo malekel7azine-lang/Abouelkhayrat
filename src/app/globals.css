@@ -6,3 +6,11 @@ body { margin: 0; background: #0b1020; color: #edf2f7; font-family: Arial, Tahom
 a { color: inherit; text-decoration: none; }
 .panel { border: 1px solid #263149; background: #111a2d; border-radius: 16px; padding: 20px; }
 .muted { color: #9aa9c2; }
+.field { width: 100%; border: 1px solid #334155; border-radius: 10px; background: #0b1222; color: #edf2f7; padding: 12px 14px; outline: none; }
+.field:focus { border-color: #0891b2; }
+.action { border-radius: 10px; background: #0e7490; color: white; padding: 12px 18px; font-weight: 600; }
+.action:disabled { opacity: .5; }
+.subaction { border: 1px solid #475569; border-radius: 8px; padding: 6px 10px; }
+.subaction.danger { border-color: #7f1d1d; color: #fca5a5; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
