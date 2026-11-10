@@ -40,7 +40,7 @@ async function processJob(j){
   const inputs=[];
   for(let i=0;i<j.videos.length;i++){const u=await publicUrl(j.videos[i]);const f=path.join(dir,"clip-"+i+".mp4");await download(u.href,f);inputs.push(f);j.progress=Math.round((i+1)/j.videos.length*35);}
   const args=[];for(const f of inputs)args.push("-i",f);
-  const filters=inputs.map((_,i)=>"[ "+i+":v:0 ]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v"+i+"];["+i+":a:0]aresample=48000[a"+i+"]").join(";");
+  const filters=inputs.map((_,i)=>"["+i+":v:0]scale=1920:1080:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=30,format=yuv420p[v"+i+"];["+i+":a:0]aresample=48000[a"+i+"]").join(";");
   const concat=inputs.map((_,i)=>"[v"+i+"][a"+i+"]").join("")+"concat=n="+inputs.length+":v=1:a=1[v][a]";
   const output=path.join(dir,"merged.mp4");args.push("-filter_complex",filters+";"+concat,"-map","[v]","-map","[a]","-c:v","libx264","-preset","veryfast","-crf","18","-c:a","aac","-b:a","192k","-movflags","+faststart","-t","3600",output);
   j.progress=40;await execFfmpeg(args);const st=await fs.stat(output);j.outputPath=output;j.outputSize=st.size;j.directory=dir;j.status="completed";j.progress=100;j.expiresAt=new Date(Date.now()+RETENTION).toISOString();
