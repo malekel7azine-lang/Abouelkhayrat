@@ -79,3 +79,33 @@ if (!Array.isArray(mediaList.items) || !mediaList.items.some(item => item.id ===
 }
 
 console.log("MCP smoke test passed: initialize, tools/list, generate_image pending state, get_task, list_media.");
+
+const adminHeaders = { "x-admin-token": token, "Content-Type": "application/json" };
+const keyListBefore = await fetch(base + "/api/admin/keys", { headers: adminHeaders });
+if (!keyListBefore.ok) throw new Error("Protected admin key endpoint did not authorize the configured admin token");
+const dummySecret = "ci-only-provider-secret-123456789";
+const addKeyResponse = await fetch(base + "/api/admin/keys", {
+  method: "POST",
+  headers: adminHeaders,
+  body: JSON.stringify({ provider: "kie", label: "CI smoke key", secret: dummySecret })
+});
+if (addKeyResponse.status !== 201) throw new Error("Provider key creation failed");
+const keyList = await (await fetch(base + "/api/admin/keys", { headers: adminHeaders })).json();
+const dummyKey = (keyList.keys || []).find(key => key.label === "CI smoke key");
+if (!dummyKey || JSON.stringify(keyList).includes(dummySecret)) throw new Error("Provider key was not masked in the admin API");
+const disabled = await fetch(base + "/api/admin/keys/" + encodeURIComponent(dummyKey.id), {
+  method: "PATCH", headers: adminHeaders, body: JSON.stringify({ status: "disabled" })
+});
+if (!disabled.ok) throw new Error("Provider key disable operation failed");
+const removed = await fetch(base + "/api/admin/keys/" + encodeURIComponent(dummyKey.id), {
+  method: "DELETE", headers: adminHeaders
+});
+if (!removed.ok) throw new Error("Provider key deletion failed");
+
+const adminTasks = await fetch(base + "/api/tasks?limit=20", { headers: adminHeaders });
+if (!adminTasks.ok) throw new Error("Protected task administration endpoint failed");
+const adminTaskData = await adminTasks.json();
+if (!(adminTaskData.tasks || []).some(item => item.id === createdTask.task_id)) throw new Error("Admin task list did not include the created task");
+
+console.log("Admin smoke test passed: provider key encryption/masking, disable/delete, protected task listing.");
+
