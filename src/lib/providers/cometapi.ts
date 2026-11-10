@@ -33,7 +33,7 @@ export async function createCometImage(input: Record<string, unknown>): Promise<
       method: "POST",
       headers: { Authorization: "Bearer " + key.secret, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: String(input.model || process.env.COMET_IMAGE_MODEL || "gpt-image-2.5-flare"),
+        model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.5-flare"),
         prompt: input.prompt,
         n: 1,
         size: input.size || "1024x1024",
@@ -53,7 +53,7 @@ export async function createCometVideo(input: Record<string, unknown>): Promise<
   return withCometKeys(async key => {
     const imageUrls = Array.isArray(input.image_urls) ? input.image_urls : [];
     const payload: Record<string, unknown> = {
-      model: String(input.model || process.env.COMET_VIDEO_MODEL || "grok-imagine-video-1.5"),
+      model: String(process.env.COMET_VIDEO_MODEL || "grok-imagine-video-1.5"),
       prompt: input.prompt,
       duration: Math.max(1, Math.min(15, Number(input.duration || 8))),
       aspect_ratio: input.aspect_ratio || "16:9",

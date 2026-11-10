@@ -34,12 +34,12 @@ async function beginWithFallback(taskId: string, kind: "image" | "video", input:
       }
       if (provider === "cometapi" && kind === "image") {
         const output = await createCometImage(input);
-        await updateTask(taskId, { status: "completed", provider: "cometapi", model: String(input.model || process.env.COMET_IMAGE_MODEL || ""), result: { provider: "cometapi", output } });
+        await updateTask(taskId, { status: "completed", provider: "cometapi", model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.5-flare"), result: { provider: "cometapi", output } });
         return;
       }
       if (provider === "cometapi" && kind === "video") {
         const created = await createCometVideo(input);
-        await updateTask(taskId, { status: "processing", provider: "cometapi", model: String(input.model || process.env.COMET_VIDEO_MODEL || ""), result: { provider: "cometapi", providerTaskId: created.taskId } });
+        await updateTask(taskId, { status: "processing", provider: "cometapi", model: String(process.env.COMET_VIDEO_MODEL || "grok-imagine-video-1.5"), result: { provider: "cometapi", providerTaskId: created.taskId } });
         return;
       }
     } catch (error) {
