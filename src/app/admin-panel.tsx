@@ -85,7 +85,7 @@ export default function AdminPanel() {
       <h2 className="text-xl font-semibold">مفاتيح API</h2>
       {keys.length === 0 ? <p className="muted text-sm">لا توجد مفاتيح محفوظة في قاعدة البيانات. قد تكون مفاتيح البيئة مستخدمة عند توفرها.</p> :
         <div className="overflow-x-auto"><table className="w-full text-right text-sm"><thead><tr className="muted border-b border-slate-700"><th className="p-2">المزود</th><th className="p-2">الاسم</th><th className="p-2">الحالة</th><th className="p-2">إجراء</th></tr></thead><tbody>
-          {keys.map(key => <tr key={key.id} className="border-b border-slate-800"><td className="p-2">{key.provider}</td><td className="p-2">{key.label}<div className="muted text-xs">{key.masked}</div></td><td className="p-2">{key.status}</td><td className="flex flex-wrap gap-2 p-2"><button className="subaction" onClick={() => updateKey(key.id, key.status === "disabled" ? "active" : "disabled")}>{key.status === "disabled" ? "تفعيل" : "تعطيل"}</button><button className="subaction danger" onClick={() => updateKey(key.id, "delete")}>حذف</button></td></tr>)}
+          {keys.map(key => <tr key={key.id} className="border-b border-slate-800"><td className="p-2">{key.provider}</td><td className="p-2">{key.label}<div className="muted text-xs">{key.masked}</div></td><td className="p-2">{key.status}</td><td className="flex flex-wrap gap-2 p-2"><button className="subaction" onClick={() => updateKey(key.id, key.status === "active" ? "disabled" : "active")}>{key.status === "active" ? "تعطيل" : "إعادة تفعيل"}</button>{!key.id.startsWith("env-") && <button className="subaction danger" onClick={() => updateKey(key.id, "delete")}>حذف</button>}</td></tr>)}
         </tbody></table></div>}
     </section>
 
