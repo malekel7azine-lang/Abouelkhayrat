@@ -38,8 +38,7 @@ export async function createCometImage(input: Record<string, unknown>): Promise<
         n: 1,
         size: input.size || "1024x1024",
         quality: input.quality || "medium",
-        output_format: input.output_format || "png",
-        response_format: "b64_json"
+        output_format: input.output_format || "png"
       }),
       cache: "no-store"
     });
