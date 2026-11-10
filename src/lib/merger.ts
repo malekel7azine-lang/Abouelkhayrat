@@ -6,7 +6,11 @@ async function mergerRequest(path: string, init?: RequestInit): Promise<any> {
   if (!BASE) throw new ProviderError("Merger service is not configured", "fatal");
   let response: Response;
   try {
-    response = await fetch(BASE + path, { ...init, headers: { "Content-Type": "application/json", ...(init?.headers || {}) }, cache: "no-store" });
+    response = await fetch(BASE + path, {
+      ...init,
+      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      cache: "no-store"
+    });
   } catch {
     throw new ProviderError("Merger service network failure", "temporary");
   }
@@ -18,18 +22,31 @@ async function mergerRequest(path: string, init?: RequestInit): Promise<any> {
 export async function createMergeJob(clips: string[]): Promise<{ jobId: string }> {
   if (clips.length < 2 || clips.length > 10) throw new ProviderError("Provide between 2 and 10 public video URLs", "parameter");
   for (const clip of clips) {
-    const url = new URL(clip);
+    let url: URL;
+    try { url = new URL(clip); } catch { throw new ProviderError("Invalid video URL", "parameter"); }
     if (url.protocol !== "https:" && url.protocol !== "http:") throw new ProviderError("Only public HTTP(S) URLs are supported", "parameter");
   }
-  const created = await mergerRequest("/api/jobs", { method: "POST", body: JSON.stringify({ clips }) });
-  const jobId = created.jobId || created.id || created.data?.jobId;
-  if (!jobId) throw new ProviderError("Merger service did not return a job ID", "fatal");
-  await mergerRequest("/api/jobs/" + encodeURIComponent(String(jobId)) + "/process", { method: "POST", body: JSON.stringify({}) });
-  return { jobId: String(jobId) };
+  const created = await mergerRequest("/api/jobs", {
+    method: "POST",
+    body: JSON.stringify({ videos: clips })
+  });
+  const jobId = created.jobId;
+  if (!jobId || typeof jobId !== "string") throw new ProviderError("Merger service did not return a job ID", "fatal");
+  // The service contract requires exactly one process request for each newly created job.
+  await mergerRequest("/api/jobs/" + encodeURIComponent(jobId) + "/process", { method: "POST" });
+  return { jobId };
 }
 
 export async function getMergeJob(jobId: string): Promise<{ state: string; result: unknown; error?: string }> {
   const body = await mergerRequest("/api/jobs/" + encodeURIComponent(jobId), { method: "GET" });
-  const state = String(body.status || body.state || "processing").toLowerCase();
-  return { state, result: body.result || body.output || body, error: body.error ? String(body.error) : undefined };
+  const state = String(body.status || "processing").toLowerCase();
+  const result = {
+    url: body.videoUrl || body.downloadUrl || null,
+    progress: typeof body.progress === "number" ? body.progress : null,
+    expiresAt: body.expiresAt || null,
+    format: "mp4",
+    videoCodec: "h264",
+    audioCodec: "aac"
+  };
+  return { state, result, error: body.error ? String(body.error) : undefined };
 }
