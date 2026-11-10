@@ -1,11 +1,12 @@
+import { ensureSchema } from "@/lib/db";
+
 export const dynamic = "force-dynamic";
 
 async function getHealth() {
   try {
-    const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
-    const response = await fetch(`${base}/api/health`, { cache: "no-store" });
-    return response.ok ? "متصل" : "غير متاح";
-  } catch { return "بانتظار الإعداد"; }
+    await ensureSchema();
+    return "متصل";
+  } catch { return "غير متاح"; }
 }
 
 export default async function Dashboard() {
@@ -26,7 +27,7 @@ export default async function Dashboard() {
       <ul className="mt-4 list-inside list-disc space-y-2 text-sm leading-7">
         <li>تم إنشاء هيكل Next.js وTypeScript.</li>
         <li>تم إعداد عميل Turso ومخطط المهام ومفاتيح المزودين.</li>
-        <li>واجهات MCP وتوليد الوسائط قيد الاستكمال والتحقق.</li>
+        <li>نقطة MCP الأولية متاحة؛ عمليات التوليد والدمج قيد التنفيذ.</li>
         <li>لم تُضف أي مفاتيح API حقيقية إلى المستودع.</li>
       </ul>
     </section>
