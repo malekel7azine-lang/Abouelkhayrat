@@ -96,7 +96,8 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
     } else if (terminalFailure(status.state)) {
       await updateTask(task.id, { status: "failed", errorCode: "PROVIDER_TASK_FAILED", result: { provider: task.provider, error: "Provider task failed" } });
     } else {
-      await updateTask(task.id, { status: "processing", result: { ...stored, retryAfter: Date.now() + 3_000 } });
+      const pollDelay = task.provider === "cometapi" ? 10_000 : task.provider === "merger" ? 5_000 : 3_000;
+      await updateTask(task.id, { status: "processing", result: { ...stored, retryAfter: Date.now() + pollDelay } });
     }
   } catch (error) {
     if (error instanceof ProviderError && (error.kind === "parameter" || error.kind === "fatal")) {
