@@ -26,7 +26,7 @@ async function mergerRequest(path: string, init?: RequestInit): Promise<any> {
   try {
     response = await fetch(BASE + path, {
       ...init,
-      headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+      headers: { "Content-Type": "application/json", ...(process.env.MERGER_API_TOKEN ? { Authorization: `Bearer ${process.env.MERGER_API_TOKEN}` } : {}), ...(init?.headers || {}) },
       cache: "no-store"
     });
   } catch {
@@ -54,7 +54,7 @@ export async function getMergeJob(jobId: string): Promise<{ state: string; resul
   const body = await mergerRequest("/api/jobs/" + encodeURIComponent(jobId), { method: "GET" });
   const state = String(body.status || "processing").toLowerCase();
   const result = {
-    url: body.videoUrl || body.downloadUrl || null,
+    url: body.videoUrl ? new URL(String(body.videoUrl), BASE).toString() : body.downloadUrl || null,
     progress: typeof body.progress === "number" ? body.progress : null,
     expiresAt: body.expiresAt || null,
     format: "mp4",
