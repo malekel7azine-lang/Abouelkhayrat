@@ -37,7 +37,7 @@ Generation is asynchronous. The initial call returns a task ID. Use `get_task` t
 - Kie.ai uses `POST /api/v1/jobs/createTask` and `GET /api/v1/jobs/recordInfo?taskId=...`.
 - CometAPI image generation uses its OpenAI-compatible images endpoint; video generation uses its asynchronous video endpoint.
 - API keys are attempted in `created_at ASC, id ASC` order. Unauthorized keys are disabled; insufficient-credit keys are marked exhausted but remain retryable; temporary failures fall through to the next key; parameter errors stop the attempt.
-- Merger API v2 uses `POST /api/jobs`, then calls `POST /api/jobs/{jobId}/process` exactly once, and polls `GET /api/jobs/{jobId}`.
+- Merger API v2 uses `POST /api/jobs` with `{"videos":[...]}`, then calls `POST /api/jobs/{jobId}/process` exactly once after persisting the job ID, and polls `GET /api/jobs/{jobId}`. The service output profile is MP4 (H.264 + AAC), CRF 18, maximum 1080p, with automatic deletion after 24 hours.
 
 ## Local development
 
