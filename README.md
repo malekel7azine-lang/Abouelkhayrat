@@ -1,33 +1,52 @@
 # MCP Media Generator
 
-A Next.js application that exposes image/video generation and media-management tools through an MCP Streamable HTTP endpoint, with an Arabic RTL administration dashboard.
-
-## Status
-
-Initial repository scaffold. Provider integrations, database migrations, security hardening, and deployment validation are implemented in subsequent commits.
+Next.js application exposing image generation, video generation, video merging, and media task management through an MCP Streamable HTTP endpoint, with an Arabic RTL administration dashboard.
 
 ## Stack
 
-- Next.js App Router + TypeScript
-- Model Context Protocol SDK (Streamable HTTP)
+- Next.js 15 App Router + TypeScript
+- Official Model Context Protocol SDK (Streamable HTTP)
 - Turso / libSQL
-- Tailwind CSS
+- Kie.ai and CometAPI provider adapters
+- External Merger API v2
 
-## Required environment variables
+## Environment
 
-See [`.env.example`](./.env.example). Never commit API keys, database tokens, or access tokens.
+Configure these values in Vercel (never commit real credentials):
 
-## Local development
+- `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
+- `MCP_AUTH_TOKEN` (required to protect the MCP endpoint)
+- `ADMIN_API_TOKEN` (optional; defaults to MCP_AUTH_TOKEN for dashboard administration)
+- `KIE_API_KEY`, `COMETAPI_API_KEY` (optional fallback keys; additional ordered keys can be managed in the dashboard)
+- `MERGER_API_BASE` (required for video merging)
+- Optional model/base URL overrides are listed in `.env.example`.
 
-```bash
-npm install
-npm run dev
-```
+Provider keys entered through the dashboard are stored server-side in Turso and are never returned by the API; only masked hints are displayed. Keep database credentials and provider keys private.
 
 ## MCP endpoint
 
 `/mcp`
 
+Tools: `generate_image`, `generate_video`, `merge_videos`, `get_task`, and `list_media`.
+
+Generation is asynchronous. The initial call returns a task ID. Use `get_task` to refresh provider state and retrieve completed results. When all provider keys are temporarily unavailable, the task remains processing and can be retried after approximately 45 seconds using the same task ID.
+
+## Provider behavior
+
+- Kie.ai uses `POST /api/v1/jobs/createTask` and `GET /api/v1/jobs/recordInfo?taskId=...`.
+- CometAPI image generation uses its OpenAI-compatible images endpoint; video generation uses its asynchronous video endpoint.
+- API keys are attempted in `created_at ASC, id ASC` order. Unauthorized keys are disabled; insufficient-credit keys are marked exhausted but remain retryable; temporary failures fall through to the next key; parameter errors stop the attempt.
+- Merger API v2 uses `POST /api/jobs`, then calls `POST /api/jobs/{jobId}/process` exactly once, and polls `GET /api/jobs/{jobId}`.
+
+## Local development
+
+```bash
+npm install
+npm run typecheck
+npm run build
+npm run dev
+```
+
 ## Deployment
 
-Deploy to Vercel after configuring the environment variables listed in `.env.example`.
+Connect this repository to Vercel and configure the environment variables above. Never commit `.env`, provider credentials, database tokens, or GitHub access tokens.
