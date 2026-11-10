@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { timingSafeEqual } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { z } from "zod";
+import { z } from "zod/v4";
 import { getTaskWithRefresh, publicTask, startMediaTask, startMergeTask } from "@/lib/media-engine";
 
 export const config = { api: { bodyParser: false } };
