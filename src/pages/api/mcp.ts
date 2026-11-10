@@ -3,11 +3,9 @@ import { timingSafeEqual } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod";
-import { getTask, listTasks } from "@/lib/tasks";
+import { getTaskWithRefresh, publicTask, startMediaTask, startMergeTask } from "@/lib/media-engine";
 
-export const config = {
-  api: { bodyParser: false },
-};
+export const config = { api: { bodyParser: false } };
 
 function authorized(req: NextApiRequest): boolean {
   const expected = process.env.MCP_AUTH_TOKEN;
@@ -20,39 +18,60 @@ function authorized(req: NextApiRequest): boolean {
 }
 
 function createServer() {
-  const server = new McpServer({ name: "mcp-media-generator", version: "1.0.0" });
+  const server = new McpServer({ name: "mcp-media-generator", version: "1.1.0" });
 
-  server.tool("generate_image", "Generate an image. Provider execution is not enabled until provider adapters are configured.", {
-    prompt: z.string().min(1),
+  server.tool("generate_image", "Create an asynchronous image generation task using Kie.ai with CometAPI fallback. Use get_task to retrieve its result.", {
+    prompt: z.string().min(1).max(32000),
     model: z.string().optional(),
-    aspect_ratio: z.string().optional()
-  }, async () => ({
-    isError: true,
-    content: [{ type: "text", text: "Image generation is not configured yet. Provider adapter implementation is pending." }]
-  }));
+    aspect_ratio: z.string().optional(),
+    resolution: z.enum(["1K", "2K", "4K"]).optional(),
+    quality: z.enum(["low", "medium", "high", "xhigh", "max", "auto"]).optional(),
+    output_format: z.enum(["png", "jpeg", "webp"]).optional()
+  }, async (args) => {
+    try {
+      const taskId = await startMediaTask("image", args);
+      const task = await getTaskWithRefresh(taskId);
+      return { content: [{ type: "text", text: JSON.stringify({ task_id: taskId, status: task?.status || "processing" }) }] };
+    } catch {
+      return { isError: true, content: [{ type: "text", text: "Unable to create image task." }] };
+    }
+  });
 
-  server.tool("generate_video", "Generate a video. Provider execution is not enabled until provider adapters are configured.", {
-    prompt: z.string().min(1),
+  server.tool("generate_video", "Create an asynchronous video generation task using Kie.ai with CometAPI fallback. Use get_task to retrieve its result.", {
+    prompt: z.string().min(1).max(4096),
     model: z.string().optional(),
-    duration: z.number().int().positive().optional()
-  }, async () => ({
-    isError: true,
-    content: [{ type: "text", text: "Video generation is not configured yet. Provider adapter implementation is pending." }]
-  }));
+    duration: z.number().int().min(1).max(15).optional(),
+    aspect_ratio: z.string().optional(),
+    resolution: z.enum(["480p", "720p", "1080p"]).optional(),
+    image_urls: z.array(z.string().url()).max(7).optional()
+  }, async (args) => {
+    try {
+      const taskId = await startMediaTask("video", args);
+      const task = await getTaskWithRefresh(taskId);
+      return { content: [{ type: "text", text: JSON.stringify({ task_id: taskId, status: task?.status || "processing" }) }] };
+    } catch {
+      return { isError: true, content: [{ type: "text", text: "Unable to create video task." }] };
+    }
+  });
 
-  server.tool("merge_videos", "Merge up to 10 video clips using the configured external merger service.", {
+  server.tool("merge_videos", "Create a video merge job from 2 to 10 publicly accessible HTTP(S) video URLs. Output is MP4.", {
     clips: z.array(z.string().url()).min(2).max(10)
-  }, async () => ({
-    isError: true,
-    content: [{ type: "text", text: "Video merging is not configured yet. Merger adapter implementation is pending." }]
-  }));
+  }, async ({ clips }) => {
+    try {
+      const taskId = await startMergeTask(clips);
+      const task = await getTaskWithRefresh(taskId);
+      return { content: [{ type: "text", text: JSON.stringify({ task_id: taskId, status: task?.status || "processing" }) }] };
+    } catch {
+      return { isError: true, content: [{ type: "text", text: "Unable to create merge task." }] };
+    }
+  });
 
-  server.tool("get_task", "Retrieve a task by its task ID.", {
+  server.tool("get_task", "Retrieve a task by task ID. Processing tasks are refreshed; temporary provider failures are retried after approximately 45 seconds using the same task ID.", {
     task_id: z.string().min(1)
   }, async ({ task_id }) => {
     try {
-      const task = await getTask(task_id);
-      return { content: [{ type: "text", text: task ? JSON.stringify(task) : JSON.stringify({ error: "TASK_NOT_FOUND" }) }] };
+      const task = await getTaskWithRefresh(task_id);
+      return { content: [{ type: "text", text: task ? JSON.stringify(publicTask(task)) : JSON.stringify({ error: "TASK_NOT_FOUND" }) }] };
     } catch {
       return { isError: true, content: [{ type: "text", text: "Task storage is unavailable." }] };
     }
@@ -62,8 +81,9 @@ function createServer() {
     limit: z.number().int().min(1).max(100).optional()
   }, async ({ limit }) => {
     try {
+      const { listTasks } = await import("@/lib/tasks");
       const tasks = await listTasks(limit ?? 30);
-      return { content: [{ type: "text", text: JSON.stringify({ items: tasks }) }] };
+      return { content: [{ type: "text", text: JSON.stringify({ items: tasks.map(publicTask) }) }] };
     } catch {
       return { isError: true, content: [{ type: "text", text: "Media storage is unavailable." }] };
     }
@@ -78,10 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).send("Method Not Allowed");
   }
   if (!authorized(req)) return res.status(401).send("Unauthorized");
-
   const server = createServer();
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-
   try {
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
