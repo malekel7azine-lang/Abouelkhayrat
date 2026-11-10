@@ -34,7 +34,7 @@ async function beginWithFallback(taskId: string, kind: "image" | "video", input:
       }
       if (provider === "cometapi" && kind === "image") {
         const output = await createCometImage(input);
-        await updateTask(taskId, { status: "completed", provider: "cometapi", model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.5-flare"), result: { provider: "cometapi", output } });
+        await updateTask(taskId, { status: "completed", provider: "cometapi", model: String(process.env.COMET_IMAGE_MODEL || "gpt-image-2.6-flare"), result: { provider: "cometapi", output } });
         return;
       }
       if (provider === "cometapi" && kind === "video") {
