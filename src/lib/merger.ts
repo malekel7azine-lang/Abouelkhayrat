@@ -26,15 +26,14 @@ export async function createMergeJob(clips: string[]): Promise<{ jobId: string }
     try { url = new URL(clip); } catch { throw new ProviderError("Invalid video URL", "parameter"); }
     if (url.protocol !== "https:" && url.protocol !== "http:") throw new ProviderError("Only public HTTP(S) URLs are supported", "parameter");
   }
-  const created = await mergerRequest("/api/jobs", {
-    method: "POST",
-    body: JSON.stringify({ videos: clips })
-  });
-  const jobId = created.jobId;
-  if (!jobId || typeof jobId !== "string") throw new ProviderError("Merger service did not return a job ID", "fatal");
-  // The service contract requires exactly one process request for each newly created job.
+  const created = await mergerRequest("/api/jobs", { method: "POST", body: JSON.stringify({ videos: clips }) });
+  if (!created.jobId || typeof created.jobId !== "string") throw new ProviderError("Merger service did not return a job ID", "fatal");
+  return { jobId: created.jobId };
+}
+
+export async function processMergeJob(jobId: string): Promise<void> {
+  // Called once only after the job ID has been persisted in the tasks table.
   await mergerRequest("/api/jobs/" + encodeURIComponent(jobId) + "/process", { method: "POST" });
-  return { jobId };
 }
 
 export async function getMergeJob(jobId: string): Promise<{ state: string; result: unknown; error?: string }> {

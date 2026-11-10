@@ -2,27 +2,27 @@ import { createTask, getTask, updateTask, type TaskRecord } from "@/lib/tasks";
 import { ProviderError } from "@/lib/provider-errors";
 import { createKieTask, getKieTask } from "@/lib/providers/kie";
 import { createCometImage, createCometVideo, getCometVideo } from "@/lib/providers/cometapi";
-import { createMergeJob, getMergeJob } from "@/lib/merger";
+import { createMergeJob, processMergeJob, getMergeJob } from "@/lib/merger";
 
 type MediaKind = "image" | "video" | "merge";
-type StoredResult = { providerTaskId?: string; provider?: string; retryAfter?: number; output?: unknown; error?: string };
+type StoredResult = { providerTaskId?: string; provider?: string; providerKeyId?: string; retryAfter?: number; processRequested?: boolean; output?: unknown; error?: string };
 
 function parseStored(value: string | null): StoredResult {
   if (!value) return {};
   try { return JSON.parse(value) as StoredResult; } catch { return {}; }
 }
 
-async function setPending(taskId: string, input: unknown, message = "TEMPORARY_PROVIDER_FAILURE") {
+async function setPending(taskId: string, message = "TEMPORARY_PROVIDER_FAILURE") {
   await updateTask(taskId, { status: "processing", result: { retryAfter: Date.now() + 45_000, error: message } });
 }
 
-async function beginWithFallback(taskId: string, kind: MediaKind, input: Record<string, unknown>): Promise<void> {
-  await updateTask(taskId, { status: "processing", errorCode: undefined });
+async function beginWithFallback(taskId: string, kind: "image" | "video", input: Record<string, unknown>): Promise<void> {
+  await updateTask(taskId, { status: "processing" });
   const providers: Array<"kie" | "cometapi"> = ["kie", "cometapi"];
   let lastError: ProviderError | undefined;
   for (const provider of providers) {
     try {
-      if (provider === "kie" && kind !== "merge") {
+      if (provider === "kie") {
         const created = await createKieTask(kind, input);
         await updateTask(taskId, {
           status: "processing", provider: "kie",
@@ -49,7 +49,7 @@ async function beginWithFallback(taskId: string, kind: MediaKind, input: Record<
       lastError = error instanceof ProviderError ? error : new ProviderError("Provider request failed", "temporary");
     }
   }
-  await setPending(taskId, input, lastError?.kind.toUpperCase() || "TEMPORARY_PROVIDER_FAILURE");
+  await setPending(taskId, lastError?.kind.toUpperCase() || "TEMPORARY_PROVIDER_FAILURE");
 }
 
 export async function startMediaTask(kind: "image" | "video", input: Record<string, unknown>): Promise<string> {
@@ -62,9 +62,17 @@ export async function startMergeTask(clips: string[]): Promise<string> {
   const taskId = await createTask("merge", { clips });
   try {
     const job = await createMergeJob(clips);
-    await updateTask(taskId, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId } });
+    // Persist the returned ID before calling process so the process endpoint is never repeated.
+    await updateTask(taskId, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId, processRequested: true } });
+    try {
+      await processMergeJob(job.jobId);
+    } catch (error) {
+      if (!(error instanceof ProviderError) || error.kind !== "temporary") {
+        await updateTask(taskId, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" });
+      }
+    }
   } catch (error) {
-    if (error instanceof ProviderError && error.kind === "temporary") await setPending(taskId, { clips });
+    if (error instanceof ProviderError && error.kind === "temporary") await setPending(taskId);
     else await updateTask(taskId, { status: "failed", errorCode: error instanceof ProviderError ? error.kind.toUpperCase() : "MERGER_FAILED" });
   }
   return taskId;
@@ -77,7 +85,7 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
   if (!stored.providerTaskId) return;
   try {
     let status: { state: string; result: unknown; error?: string };
-    if (task.provider === "kie") status = await getKieTask(stored.providerTaskId, String((stored as any).providerKeyId || ""));
+    if (task.provider === "kie") status = await getKieTask(stored.providerTaskId, stored.providerKeyId);
     else if (task.provider === "cometapi") status = await getCometVideo(stored.providerTaskId);
     else if (task.provider === "merger") status = await getMergeJob(stored.providerTaskId);
     else return;
@@ -86,10 +94,14 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
       await updateTask(task.id, { status: "completed", result: { provider: task.provider, output: status.result } });
     } else if (terminalFailure(status.state)) {
       await updateTask(task.id, { status: "failed", errorCode: "PROVIDER_TASK_FAILED", result: { provider: task.provider, error: "Provider task failed" } });
+    } else {
+      await updateTask(task.id, { status: "processing", result: { ...stored, retryAfter: undefined } });
     }
   } catch (error) {
     if (error instanceof ProviderError && (error.kind === "parameter" || error.kind === "fatal")) {
       await updateTask(task.id, { status: "failed", errorCode: "PROVIDER_TASK_FAILED" });
+    } else {
+      await updateTask(task.id, { status: "processing", result: { ...stored, retryAfter: Date.now() + 45_000 } });
     }
   }
 }
@@ -99,18 +111,21 @@ export async function getTaskWithRefresh(taskId: string): Promise<TaskRecord | n
   if (!task || task.status !== "processing") return task;
   const stored = parseStored(task.result_json);
   if (stored.providerTaskId) {
-    await refreshRemote(task, stored);
+    if (!stored.retryAfter || Date.now() >= stored.retryAfter) await refreshRemote(task, stored);
   } else if (stored.retryAfter && Date.now() >= stored.retryAfter) {
     let input: Record<string, unknown> = {};
     try { input = JSON.parse(task.input_json) as Record<string, unknown>; } catch { /* keep empty */ }
     if (task.type === "merge") {
-      const clips = Array.isArray(input.clips) ? input.clips.map(String) : [];
       try {
-        const job = await createMergeJob(clips);
-        await updateTask(task.id, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId } });
+        const job = await createMergeJob(Array.isArray(input.clips) ? input.clips.map(String) : []);
+        await updateTask(task.id, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId, processRequested: true } });
+        try { await processMergeJob(job.jobId); }
+        catch (error) {
+          if (!(error instanceof ProviderError) || error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" });
+        }
       } catch (error) {
         if (error instanceof ProviderError && error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: error.kind.toUpperCase() });
-        else await setPending(task.id, input);
+        else await setPending(task.id);
       }
     } else {
       await beginWithFallback(task.id, task.type as "image" | "video", input);
