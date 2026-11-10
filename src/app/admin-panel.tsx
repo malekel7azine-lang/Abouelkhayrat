@@ -31,6 +31,7 @@ export default function AdminPanel() {
       const keyData = await keyResponse.json();
       const taskData = await taskResponse.json();
       setKeys(keyData.keys || []);
+      setConfig(keyData.config || null);
       setTasks(taskData.tasks || []);
       setMessage("تم تحديث البيانات.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "حدث خطأ."); }
@@ -72,6 +73,15 @@ export default function AdminPanel() {
       </div>
       {message && <p className="text-sm text-cyan-200">{message}</p>}
     </section>
+
+    {config && <section className="panel space-y-3">
+      <h2 className="text-xl font-semibold">حالة إعداد الخدمات</h2>
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">Kie.ai</p><p className={config.kieConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.kieConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
+        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">CometAPI</p><p className={config.cometapiConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.cometapiConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
+        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">Merger API v2</p><p className={config.mergerConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.mergerConfigured ? "مُعدّ" : "يحتاج MERGER_API_BASE"}</p></div>
+      </div>
+    </section>}
 
     <section className="panel space-y-4">
       <div><h2 className="text-xl font-semibold">إضافة مفتاح مزود</h2><p className="muted mt-1 text-sm">المفتاح يُرسل إلى الخادم فقط، ولا يُعاد عرضه بعد الحفظ.</p></div>
