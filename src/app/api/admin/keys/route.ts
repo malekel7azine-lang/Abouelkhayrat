@@ -6,7 +6,14 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request) {
   if (!isAdminAuthorized(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  try { return NextResponse.json({ keys: await providerKeySummary() }); }
+  try {
+    const keys = await providerKeySummary();
+    return NextResponse.json({ keys, config: {
+      kieConfigured: keys.some(key => key.provider === "kie" && key.status !== "disabled"),
+      cometapiConfigured: keys.some(key => key.provider === "cometapi" && key.status !== "disabled"),
+      mergerConfigured: Boolean(process.env.MERGER_API_BASE)
+    } });
+  }
   catch { return NextResponse.json({ error: "Unable to load provider keys" }, { status: 503 }); }
 }
 

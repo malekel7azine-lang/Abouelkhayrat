@@ -4,11 +4,13 @@ import { useCallback, useState } from "react";
 
 type KeyRow = { id: string; provider: "kie" | "cometapi"; label: string; status: string; masked: string };
 type TaskRow = { id: string; type: string; status: string; provider: string | null; model: string | null; created_at: string };
+type ConfigState = { kieConfigured: boolean; cometapiConfigured: boolean; mergerConfigured: boolean };
 
 export default function AdminPanel() {
   const [token, setToken] = useState("");
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [config, setConfig] = useState<ConfigState | null>(null);
   const [provider, setProvider] = useState<"kie" | "cometapi">("kie");
   const [label, setLabel] = useState("");
   const [secret, setSecret] = useState("");
