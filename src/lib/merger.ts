@@ -59,7 +59,10 @@ export async function getMergeJob(jobId: string): Promise<{ state: string; resul
     expiresAt: body.expiresAt || null,
     format: "mp4",
     videoCodec: "h264",
-    audioCodec: "aac"
+    audioCodec: "aac",
+    crf: 18,
+    maxResolution: "1080p",
+    retentionHours: 24
   };
   return { state, result, error: body.error ? String(body.error) : undefined };
 }
