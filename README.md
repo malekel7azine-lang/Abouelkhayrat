@@ -17,6 +17,7 @@ Configure these values in Vercel (never commit real credentials):
 - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
 - `MCP_AUTH_TOKEN` (required to protect the MCP endpoint)
 - `ADMIN_API_TOKEN` (optional; defaults to MCP_AUTH_TOKEN for dashboard administration)
+- `API_KEY_ENCRYPTION_SECRET` (optional dedicated AES-256 key; defaults to the Turso auth token)
 - `KIE_API_KEY`, `COMETAPI_API_KEY` (optional fallback keys; additional ordered keys can be managed in the dashboard)
 - `MERGER_API_BASE` (required for video merging)
 - Optional model/base URL overrides are listed in `.env.example`.
