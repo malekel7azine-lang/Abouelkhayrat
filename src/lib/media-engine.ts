@@ -1,4 +1,5 @@
 import { createTask, getTask, updateTask, type TaskRecord } from "@/lib/tasks";
+import { acquireTaskLock, releaseTaskLock } from "@/lib/task-lock";
 import { ProviderError } from "@/lib/provider-errors";
 import { createKieTask, getKieTask } from "@/lib/providers/kie";
 import { createCometImage, createCometVideo, getCometVideo } from "@/lib/providers/cometapi";
@@ -107,32 +108,38 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
 }
 
 export async function getTaskWithRefresh(taskId: string): Promise<TaskRecord | null> {
-  let task = await getTask(taskId);
-  if (!task || task.status !== "processing") return task;
-  const stored = parseStored(task.result_json);
-  if (stored.providerTaskId) {
-    if (!stored.retryAfter || Date.now() >= stored.retryAfter) await refreshRemote(task, stored);
-  } else if (stored.retryAfter && Date.now() >= stored.retryAfter) {
-    let input: Record<string, unknown> = {};
-    try { input = JSON.parse(task.input_json) as Record<string, unknown>; } catch { /* keep empty */ }
-    if (task.type === "merge") {
-      try {
-        const job = await createMergeJob(Array.isArray(input.clips) ? input.clips.map(String) : []);
-        await updateTask(task.id, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId, processRequested: true } });
-        try { await processMergeJob(job.jobId); }
-        catch (error) {
-          if (!(error instanceof ProviderError) || error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" });
+  const lockToken = await acquireTaskLock(taskId);
+  if (!lockToken) return getTask(taskId);
+  try {
+    let task = await getTask(taskId);
+    if (!task || task.status !== "processing") return task;
+    const stored = parseStored(task.result_json);
+    if (stored.providerTaskId) {
+      if (!stored.retryAfter || Date.now() >= stored.retryAfter) await refreshRemote(task, stored);
+    } else if (stored.retryAfter && Date.now() >= stored.retryAfter) {
+      let input: Record<string, unknown> = {};
+      try { input = JSON.parse(task.input_json) as Record<string, unknown>; } catch { /* keep empty */ }
+      if (task.type === "merge") {
+        try {
+          const job = await createMergeJob(Array.isArray(input.clips) ? input.clips.map(String) : []);
+          await updateTask(task.id, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId, processRequested: true } });
+          try { await processMergeJob(job.jobId); }
+          catch (error) {
+            if (!(error instanceof ProviderError) || error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" });
+          }
+        } catch (error) {
+          if (error instanceof ProviderError && error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: error.kind.toUpperCase() });
+          else await setPending(task.id);
         }
-      } catch (error) {
-        if (error instanceof ProviderError && error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: error.kind.toUpperCase() });
-        else await setPending(task.id);
+      } else {
+        await beginWithFallback(task.id, task.type as "image" | "video", input);
       }
-    } else {
-      await beginWithFallback(task.id, task.type as "image" | "video", input);
     }
+    task = await getTask(taskId);
+    return task;
+  } finally {
+    await releaseTaskLock(taskId, lockToken).catch(() => undefined);
   }
-  task = await getTask(taskId);
-  return task;
 }
 
 export function publicTask(task: TaskRecord) {

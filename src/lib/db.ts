@@ -39,7 +39,8 @@ export async function ensureSchema(): Promise<void> {
           created_at TEXT NOT NULL DEFAULT (datetime('now')),
           updated_at TEXT NOT NULL DEFAULT (datetime('now'))
         )`,
-        "CREATE INDEX IF NOT EXISTS idx_api_keys_order ON api_keys(created_at ASC, id ASC)"
+        "CREATE INDEX IF NOT EXISTS idx_api_keys_order ON api_keys(created_at ASC, id ASC)",
+        `CREATE TABLE IF NOT EXISTS task_locks (task_id TEXT PRIMARY KEY, lock_token TEXT NOT NULL, locked_until TEXT NOT NULL)`
       ], "write");
     })().catch((error) => {
       schemaReady = undefined;
