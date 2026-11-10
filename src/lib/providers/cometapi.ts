@@ -3,6 +3,19 @@ import { listProviderKeys, markKeyStatus, type ProviderKey } from "@/lib/provide
 
 const BASE = (process.env.COMETAPI_BASE_URL || "https://api.cometapi.com").replace(/\/$/, "");
 
+function imageSizeForAspectRatio(value: unknown): string {
+  if (typeof value !== "string" || !/^\\d+(?:\\.\\d+)?:\\d+(?:\\.\\d+)?$/.test(value)) return "1024x1024";
+  const [w, h] = value.split(":").map(Number);
+  if (!w || !h || w / h < 1 / 3 || w / h > 3) return "1024x1024";
+  if (Math.abs(w - h) < 0.001) return "1024x1024";
+  const maxDimension = 1536;
+  const scale = maxDimension / Math.max(w, h);
+  const width = Math.max(16, Math.round((w * scale) / 16) * 16);
+  const height = Math.max(16, Math.round((h * scale) / 16) * 16);
+  return width + "x" + height;
+}
+
+
 async function withCometKeys<T>(call: (key: ProviderKey) => Promise<T>): Promise<T> {
   const keys = await listProviderKeys("cometapi");
   if (!keys.length) throw new ProviderError("No CometAPI keys configured", "temporary");
