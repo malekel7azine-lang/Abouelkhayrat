@@ -22,7 +22,7 @@ Configure these values in Vercel (never commit real credentials):
 - `MERGER_API_BASE` (required for video merging)
 - Optional model/base URL overrides are listed in `.env.example`.
 
-Provider keys entered through the dashboard are stored server-side in Turso and are never returned by the API; only masked hints are displayed. Keep database credentials and provider keys private.
+Provider keys entered through the dashboard are encrypted with AES-256-GCM before being stored in Turso and are never returned by the API; only masked hints are displayed. Set `API_KEY_ENCRYPTION_SECRET` before adding provider keys if you want a dedicated encryption secret; otherwise the Turso auth token is used as the stable fallback. Do not change the encryption secret after saving keys unless you first re-encrypt the stored keys. Keep database credentials and provider keys private.
 
 ## MCP endpoint
 
