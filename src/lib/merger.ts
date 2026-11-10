@@ -1,6 +1,24 @@
+import { isIP } from "node:net";
 import { ProviderError } from "@/lib/provider-errors";
 
 const BASE = (process.env.MERGER_API_BASE || "").replace(/\/$/, "");
+
+function isPublicHttpUrl(value: string): boolean {
+  let url: URL;
+  try { url = new URL(value); } catch { return false; }
+  if (url.protocol !== "https:" && url.protocol !== "http:") return false;
+  if (url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false;
+  if (isIP(host) === 4) {
+    const [a, b] = host.split(".").map(Number);
+    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) ||
+        (a >= 224 && a <= 255)) return false;
+  }
+  if (isIP(host) === 6 && (host === "::1" || host.startsWith("fc") || host.startsWith("fd") || host.startsWith("fe80:"))) return false;
+  return true;
+}
 
 async function mergerRequest(path: string, init?: RequestInit): Promise<any> {
   if (!BASE) throw new ProviderError("Merger service is not configured", "fatal");
@@ -21,11 +39,7 @@ async function mergerRequest(path: string, init?: RequestInit): Promise<any> {
 
 export async function createMergeJob(clips: string[]): Promise<{ jobId: string }> {
   if (clips.length < 2 || clips.length > 10) throw new ProviderError("Provide between 2 and 10 public video URLs", "parameter");
-  for (const clip of clips) {
-    let url: URL;
-    try { url = new URL(clip); } catch { throw new ProviderError("Invalid video URL", "parameter"); }
-    if (url.protocol !== "https:" && url.protocol !== "http:") throw new ProviderError("Only public HTTP(S) URLs are supported", "parameter");
-  }
+  if (!clips.every(isPublicHttpUrl)) throw new ProviderError("Only public HTTP(S) video URLs are supported", "parameter");
   const created = await mergerRequest("/api/jobs", { method: "POST", body: JSON.stringify({ videos: clips }) });
   if (!created.jobId || typeof created.jobId !== "string") throw new ProviderError("Merger service did not return a job ID", "fatal");
   return { jobId: created.jobId };
