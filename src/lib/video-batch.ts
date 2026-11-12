@@ -5,7 +5,11 @@ type ChildResult = { output?: unknown };
 function parse(value: string | null): ChildResult { try { return value ? JSON.parse(value) as ChildResult : {}; } catch { return {}; } }
 function findUrl(value: unknown, depth = 0): string | null {
   if (depth > 8 || value == null) return null;
-  if (typeof value === "string") return /^https?:\/\//i.test(value) && /\.(mp4|mov|webm)(?:[?#]|$)/i.test(value) ? value : null;
+  if (typeof value === "string") {
+    if (/^https?:\/\//i.test(value)) return value;
+    if (value.startsWith("[") || value.startsWith("{")) { try { return findUrl(JSON.parse(value), depth + 1); } catch { return null; } }
+    return null;
+  }
   if (Array.isArray(value)) { for (const item of value) { const u = findUrl(item, depth + 1); if (u) return u; } return null; }
   if (typeof value === "object") { const o = value as Record<string, unknown>; for (const k of ["videoUrl","video_url","url","resultUrls","result_urls","videos","output","result","data"]) { if (k in o) { const u = findUrl(o[k], depth + 1); if (u) return u; } } }
   return null;
