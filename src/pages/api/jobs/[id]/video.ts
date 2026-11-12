@@ -1,7 +1,7 @@
 import type {NextApiRequest,NextApiResponse} from "next";
 import {getJob,iterateBlob,CHUNK_BYTES} from "@/lib/merge-store";
 export default async function handler(req:NextApiRequest,res:NextApiResponse){
- if(req.method!=="GET")return res.status(405).json({error:"طريقة الطلب غير مدعومة"});
+ res.setHeader("Access-Control-Allow-Origin","*");res.setHeader("Access-Control-Allow-Methods","GET,OPTIONS");res.setHeader("Access-Control-Allow-Headers","Range");res.setHeader("Access-Control-Expose-Headers","Content-Range,Accept-Ranges,Content-Length");if(req.method==="OPTIONS")return res.status(204).end();\n if(req.method!=="GET")return res.status(405).json({error:"طريقة الطلب غير مدعومة"});
  try{
   const id=String(req.query.id||"");const job=await getJob(id);
   if(!job)return res.status(404).json({error:"المهمة غير موجودة"});
