@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 
 type KeyRow = { id: string; provider: "kie" | "cometapi"; label: string; status: string; masked: string };
 type TaskRow = { id: string; type: string; status: string; provider: string | null; model: string | null; created_at: string };
-type ConfigState = { kieConfigured: boolean; cometapiConfigured: boolean; mergerConfigured: boolean };
+type ConfigState = { kieConfigured: boolean; cometapiConfigured: boolean; mergeConfigured: boolean };
 
 export default function AdminPanel() {
   const [token, setToken] = useState("");
@@ -79,7 +79,7 @@ export default function AdminPanel() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">Kie.ai</p><p className={config.kieConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.kieConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
         <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">CometAPI</p><p className={config.cometapiConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.cometapiConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
-        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">Merger API v2</p><p className={config.mergerConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.mergerConfigured ? "مُعدّ" : "يحتاج MERGER_API_BASE"}</p></div>
+        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">محرك FFmpeg الداخلي</p><p className={config.mergeConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.mergerConfigured ? "مُعدّ" : "يحتاج إعداد Turso"}</p></div>
       </div>
     </section>}
 
