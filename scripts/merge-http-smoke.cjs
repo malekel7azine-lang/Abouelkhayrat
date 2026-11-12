@@ -3,6 +3,7 @@ const {spawn}=require("node:child_process");
 const fs=require("node:fs/promises");
 const os=require("node:os");
 const path=require("node:path");
+const crypto=require("node:crypto");
 const ffmpeg=require("ffmpeg-static");
 const base=process.env.SMOKE_BASE_URL||"http://127.0.0.1:3000";
 function run(bin,args){return new Promise((resolve,reject)=>{const p=spawn(bin,args,{stdio:"ignore"});p.on("error",reject);p.on("close",c=>c===0?resolve():reject(Error("ffmpeg failed")));});}
@@ -18,6 +19,8 @@ async function json(url,options){const r=await fetch(url,options);const body=awa
   assert.equal(x.r.status,201);const id=x.body.jobId;assert.ok(id);
   for(const [seq,buf] of [[0,fa],[1,fb]]){const up=await fetch(base+"/api/upload?job="+id+"&seq="+seq+"&chunk=0",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:buf});assert.equal(up.status,200);}
   x=await json(base+"/api/jobs/"+id+"/process",{method:"POST"});assert.equal(x.r.status,200);assert.equal(x.body.status,"done");assert.equal(x.body.resolution,"640x360");
+  const full=await fetch(base+"/api/jobs/"+id+"/video");assert.equal(full.status,200);const output=Buffer.from(await full.arrayBuffer());const digest=crypto.createHash("sha256").update(output).digest("hex");assert.equal(output.length,x.body.size);
+  const fullAgain=await fetch(base+"/api/jobs/"+id+"/video");const digestAgain=crypto.createHash("sha256").update(Buffer.from(await fullAgain.arrayBuffer())).digest("hex");assert.equal(digest,digestAgain);
   const ranged=await fetch(base+"/api/jobs/"+id+"/video",{headers:{Range:"bytes=0-99"}});assert.equal(ranged.status,206);assert.equal(ranged.headers.get("content-range").startsWith("bytes 0-99/"),true);assert.equal((await ranged.arrayBuffer()).byteLength,100);
   const deleted=await fetch(base+"/api/jobs/"+id,{method:"DELETE"});assert.equal(deleted.status,200);
   const missing=await fetch(base+"/api/jobs/"+id);assert.equal(missing.status,404);
