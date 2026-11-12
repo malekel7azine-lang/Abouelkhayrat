@@ -14,7 +14,26 @@ main{max-width:900px;margin:auto;padding:32px 18px 70px}header{margin-bottom:24p
 <section id="result" class="panel result hidden"><h2>النتيجة النهائية</h2><video id="player" controls playsinline></video><div class="stat" id="stats"></div><div class="row" style="margin-top:14px"><a id="download" href="#" download><button>تحميل الفيديو</button></a><button class="secondary" id="copy">نسخ رابط الفيديو</button><button class="secondary" id="new">عملية جديدة</button></div><p id="expiry" class="muted"></p></section>
 <section class="panel docs"><details><summary>توثيق API للمطورين</summary><p>جميع المسارات متاحة عبر CORS. أنشئ المهمة ثم ارفع الملفات إن وجدت، وبعدها نفّذ الدمج واستطلع حالة المهمة.</p><h3>إنشاء مهمة</h3><pre>curl -X POST https://YOUR-DOMAIN/api/jobs \
  -H "Content-Type: application/json" \
- -d '{"videos":["https://host/a.mp4","https://host/b.mp4"]}'</pre><h3>تنفيذ الدمج</h3><pre>curl -X POST https://YOUR-DOMAIN/api/jobs/JOB_ID/process</pre><h3>الحالة</h3><pre>curl https://YOUR-DOMAIN/api/jobs/JOB_ID</pre><h3>تحميل الفيديو</h3><pre>curl -L "https://YOUR-DOMAIN/api/jobs/JOB_ID/video?download=1" -o merged.mp4</pre><h3>حذف المهمة</h3><pre>curl -X DELETE https://YOUR-DOMAIN/api/jobs/JOB_ID</pre><h3>الحدود</h3><pre>GET https://YOUR-DOMAIN/api/config</pre></details></section>
+ -d '{"videos":["https://host/a.mp4","https://host/b.mp4"]}'</pre><h3>تنفيذ الدمج</h3><pre>curl -X POST https://YOUR-DOMAIN/api/jobs/JOB_ID/process</pre><h3>الحالة</h3><pre>curl https://YOUR-DOMAIN/api/jobs/JOB_ID</pre><h3>تحميل الفيديو</h3><pre>curl -L "https://YOUR-DOMAIN/api/jobs/JOB_ID/video?download=1" -o merged.mp4</pre><h3>حذف المهمة</h3><pre>curl -X DELETE https://YOUR-DOMAIN/api/jobs/JOB_ID</pre><h3>الحدود</h3><pre>GET https://YOUR-DOMAIN/api/config</pre><h3>جدول نقاط API</h3><div style="overflow:auto"><table style="width:100%;border-collapse:collapse;text-align:right"><thead><tr><th>Method</th><th>Endpoint</th><th>الوظيفة</th></tr></thead><tbody>
+<tr><td>POST</td><td><code>/api/jobs</code></td><td>إنشاء مهمة</td></tr>
+<tr><td>POST</td><td><code>/api/upload?job=ID&amp;seq=N&amp;chunk=K</code></td><td>رفع جزء 4MB</td></tr>
+<tr><td>POST</td><td><code>/api/jobs/ID/process</code></td><td>تنفيذ الدمج</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/ID</code></td><td>الحالة والتقدم</td></tr>
+<tr><td>GET</td><td><code>/api/jobs/ID/video</code></td><td>بث MP4 مع Range</td></tr>
+<tr><td>DELETE</td><td><code>/api/jobs/ID</code></td><td>حذف كامل</td></tr>
+<tr><td>GET</td><td><code>/api/config</code></td><td>الحدود والإصدار</td></tr>
+<tr><td>GET</td><td><code>/api/cron</code></td><td>تنظيف المنتهي يومياً</td></tr>
+</tbody></table></div>
+<h3>رفع ملف من curl</h3><pre>curl -X POST "https://YOUR-DOMAIN/api/jobs" \
+ -H "Content-Type: application/json" \
+ -d '{"sources":[{"kind":"file","name":"first.mp4","size":FILE_SIZE_BYTES,"mime":"video/mp4"},{"kind":"url","url":"https://cdn.example/second.mp4"}]}'</pre>
+<p class="muted">استبدل FILE_SIZE_BYTES بالحجم الفعلي بالبايت. قسّم الملف إلى أجزاء لا تتجاوز 4MB، ثم أرسل كل جزء مع رقم chunk متزايد.</p>
+<pre>curl -X POST "https://YOUR-DOMAIN/api/upload?job=JOB_ID&seq=0&chunk=0" \
+ -H "Content-Type: application/octet-stream" \
+ --data-binary "@chunk-0.bin"</pre>
+<h3>تحميل مع Range</h3><pre>curl -H "Range: bytes=0-1048575" \
+ "https://YOUR-DOMAIN/api/jobs/JOB_ID/video" -o first-megabyte.bin</pre>
+</details></section>
 </main>
 <script>
 const $=id=>document.getElementById(id);let sources=[];let activeJob=null;
