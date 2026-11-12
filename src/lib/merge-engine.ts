@@ -36,6 +36,7 @@ async function probe(file:string){
 }
 export async function processMerge(id:string){
  await mergeSchema();const db=getDb();const lock=await db.execute({sql:"UPDATE jobs SET status='processing',progress=1 WHERE id=? AND status IN ('queued','uploading','failed')",args:[id]});
+ if(lock.rowsAffected===0)throw new Error("المهمة قيد المعالجة أو غير قابلة للتنفيذ");
  const jr=await db.execute({sql:"SELECT * FROM jobs WHERE id=?",args:[id]});if(!jr.rows.length)throw new Error("المهمة غير موجودة");
  const sources=await db.execute({sql:"SELECT * FROM sources WHERE job_id=? ORDER BY seq",args:[id]});
  if(sources.rows.length<2)throw new Error("أضف مصدرين على الأقل");
