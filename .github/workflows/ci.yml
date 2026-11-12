@@ -23,10 +23,15 @@ jobs:
           TURSO_DATABASE_URL: file:./ci.db
           TURSO_AUTH_TOKEN: ci-placeholder
           MCP_AUTH_TOKEN: ci-placeholder
+          MAX_SOURCES: 10
+          SOURCE_MAX_MB: 200
+          OUTPUT_MAX_MB: 150
+          MAX_TOTAL_DURATION_SEC: 600
       - name: MCP protocol smoke test
         run: |
           npm run start -- --hostname 127.0.0.1 --port 3000 > /tmp/next-start.log 2>&1 &
           node scripts/mcp-smoke.mjs
+          node scripts/merge-http-smoke.cjs
         env:
           TURSO_DATABASE_URL: file:./ci.db
           TURSO_AUTH_TOKEN: ci-placeholder
