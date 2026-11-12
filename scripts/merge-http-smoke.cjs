@@ -21,7 +21,7 @@ async function json(url,options){const r=await fetch(url,options);const body=awa
   const ranged=await fetch(base+"/api/jobs/"+id+"/video",{headers:{Range:"bytes=0-99"}});assert.equal(ranged.status,206);assert.equal(ranged.headers.get("content-range").startsWith("bytes 0-99/"),true);assert.equal((await ranged.arrayBuffer()).byteLength,100);
   const deleted=await fetch(base+"/api/jobs/"+id,{method:"DELETE"});assert.equal(deleted.status,200);
   const missing=await fetch(base+"/api/jobs/"+id);assert.equal(missing.status,404);
-  const malformed=await fetch(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:"{"});assert.equal(malformed.status,400);
+  const malformed=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:"{"});assert.equal(malformed.r.status,400);assert.ok(malformed.body.error);
   const empty=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({videos:[]})});assert.equal(empty.r.status,400);
   console.log("Merge HTTP smoke passed: upload chunks, Turso persistence, FFmpeg merge, output metadata, Range 206, delete/404, malformed JSON, empty sources.");
  }finally{await fs.rm(dir,{recursive:true,force:true});}
