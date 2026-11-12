@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ keys, config: {
       kieConfigured: keys.some(key => key.provider === "kie" && key.status !== "disabled"),
       cometapiConfigured: keys.some(key => key.provider === "cometapi" && key.status !== "disabled"),
-      mergerConfigured: Boolean(process.env.MERGER_API_BASE)
+      mergeConfigured: Boolean(process.env.TURSO_DATABASE_URL && process.env.TURSO_AUTH_TOKEN && process.env.FFMPEG_PRESET !== "disabled")
     } });
   }
   catch { return NextResponse.json({ error: "Unable to load provider keys" }, { status: 503 }); }
