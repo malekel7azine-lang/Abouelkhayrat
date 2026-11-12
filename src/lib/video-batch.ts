@@ -18,8 +18,13 @@ export async function startVideoBatch(prompts: string[], options: Record<string,
   if (prompts.length < 2 || prompts.length > 10) throw new Error("أرسل من 2 إلى 10 أوصاف فيديو");
   const parent = await createTask("video_batch", { prompts, options });
   const childIds: string[] = [];
-  for (const prompt of prompts) childIds.push(await startMediaTask("video", { ...options, prompt }));
-  await updateTask(parent, { status: "processing", provider: "pipeline", model: "video-batch-auto-merge", result: { childIds, stage: "generating", retryAfter: Date.now() + 5000 } });
+  try {
+    for (const prompt of prompts) childIds.push(await startMediaTask("video", { ...options, prompt }));
+    await updateTask(parent, { status: "processing", provider: "pipeline", model: "video-batch-auto-merge", result: { childIds, stage: "generating", retryAfter: Date.now() + 5000 } });
+  } catch (error) {
+    await updateTask(parent, { status: "failed", errorCode: "VIDEO_BATCH_START_FAILED" });
+    throw error;
+  }
   return parent;
 }
 export async function refreshVideoBatch(parentId: string, state: Record<string, unknown>) {
