@@ -1,5 +1,17 @@
 {
+  "version": 2,
   "framework": "nextjs",
   "buildCommand": "npm run build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "functions": {
+    "src/pages/api/**/*.ts": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }
