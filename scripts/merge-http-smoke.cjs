@@ -23,6 +23,7 @@ async function json(url,options){const r=await fetch(url,options);const body=awa
   const full=await fetch(base+"/api/jobs/"+id+"/video");assert.equal(full.status,200);const output=Buffer.from(await full.arrayBuffer());const digest=crypto.createHash("sha256").update(output).digest("hex");assert.equal(output.length,x.body.size);
   const fullAgain=await fetch(base+"/api/jobs/"+id+"/video");const digestAgain=crypto.createHash("sha256").update(Buffer.from(await fullAgain.arrayBuffer())).digest("hex");assert.equal(digest,digestAgain);
   const ranged=await fetch(base+"/api/jobs/"+id+"/video",{headers:{Range:"bytes=0-99"}});assert.equal(ranged.status,206);assert.equal(ranged.headers.get("content-range").startsWith("bytes 0-99/"),true);assert.equal((await ranged.arrayBuffer()).byteLength,100);
+  const suffix=await fetch(base+"/api/jobs/"+id+"/video",{headers:{Range:"bytes=-100"}});assert.equal(suffix.status,206);assert.equal((await suffix.arrayBuffer()).byteLength,100);
   const deleted=await fetch(base+"/api/jobs/"+id,{method:"DELETE"});assert.equal(deleted.status,200);
   const missing=await fetch(base+"/api/jobs/"+id);assert.equal(missing.status,404);
   const malformed=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:"{"});assert.equal(malformed.r.status,400);assert.ok(malformed.body.error);
