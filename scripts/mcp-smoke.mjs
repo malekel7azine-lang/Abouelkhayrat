@@ -51,7 +51,7 @@ if (initialized?.result?.protocolVersion !== protocolVersion) throw new Error("M
 
 const listed = await rpc({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }, true);
 const toolNames = (listed?.result?.tools || []).map(tool => tool.name);
-for (const name of ["generate_image", "generate_video", "merge_videos", "get_task", "list_media"]) {
+for (const name of ["generate_image", "generate_video", "generate_video_batch", "merge_videos", "get_task", "list_media"]) {
   if (!toolNames.includes(name)) throw new Error("Missing MCP tool: " + name);
 }
 
