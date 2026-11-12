@@ -65,3 +65,15 @@ export async function readBlob(table:"source_chunks"|"output_chunks",id:string,s
   }
   return Buffer.concat(chunks);
 }
+
+export async function* iterateBlob(table:"source_chunks"|"output_chunks",id:string,seq=0){
+  await mergeSchema();const db=getDb();let offset=0;
+  while(true){
+    const r=table==="source_chunks"
+      ? await db.execute({sql:"SELECT chunk,data FROM source_chunks WHERE job_id=? AND seq=? AND chunk>=? ORDER BY chunk LIMIT 8",args:[id,seq,offset]})
+      : await db.execute({sql:"SELECT chunk,data FROM output_chunks WHERE job_id=? AND chunk>=? ORDER BY chunk LIMIT 8",args:[id,offset]});
+    if(!r.rows.length)break;
+    for(const row of r.rows){offset=Number(row.chunk)+1;yield Buffer.from(row.data as Uint8Array);}
+    if(r.rows.length<8)break;
+  }
+}
