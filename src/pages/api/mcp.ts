@@ -4,6 +4,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { z } from "zod/v4";
 import { getTaskWithRefresh, publicTask, startMediaTask, startMergeTask } from "@/lib/media-engine";
+import { startVideoBatch } from "@/lib/video-batch";
 
 export const config = { api: { bodyParser: false } };
 
@@ -63,6 +64,21 @@ function createServer() {
       return { content: [{ type: "text", text: JSON.stringify({ task_id: taskId, status: task?.status || "processing" }) }] };
     } catch {
       return { isError: true, content: [{ type: "text", text: "Unable to create merge task." }] };
+    }
+  });
+
+  server.tool("generate_video_batch", "Generate 2 to 10 ordered video clips, wait for all to complete, then automatically merge them into one MP4. Poll with get_task.", {
+    prompts: z.array(z.string().min(1).max(4096)).min(2).max(10),
+    model: z.string().optional(),
+    duration: z.number().int().min(1).max(15).optional(),
+    aspect_ratio: z.string().optional(),
+    resolution: z.enum(["480p", "720p", "1080p"]).optional()
+  }, async ({ prompts, ...options }) => {
+    try {
+      const taskId = await startVideoBatch(prompts, options);
+      return { content: [{ type: "text", text: JSON.stringify({ task_id: taskId, status: "processing", pipeline: "generate_then_auto_merge" }) }] };
+    } catch {
+      return { isError: true, content: [{ type: "text", text: "Unable to start video batch pipeline." }] };
     }
   });
 
