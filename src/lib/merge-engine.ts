@@ -32,7 +32,8 @@ async function probe(file:string){
   let data="",err="";p.stdout.on("data",d=>data+=d);p.stderr.on("data",d=>err+=d);p.on("error",reject);p.on("close",c=>c===0?resolve(data):reject(new Error(err)));
  });
  const x=JSON.parse(out);const v=x.streams.find((s:any)=>s.codec_type==="video");if(!v)throw new Error("Source has no video stream");
- return {width:Number(v.width),height:Number(v.height),duration:Number(x.format.duration||v.duration||0),hasAudio:x.streams.some((s:any)=>s.codec_type==="audio")};
+ const rate=String(v.avg_frame_rate||v.r_frame_rate||"0/1").split("/").map(Number);const fps=rate[1]?rate[0]/rate[1]:rate[0]||0;
+ return {width:Number(v.width),height:Number(v.height),fps,duration:Number(x.format.duration||v.duration||0),hasAudio:x.streams.some((s:any)=>s.codec_type==="audio")};
 }
 export async function processMerge(id:string){
  await mergeSchema();const db=getDb();const lock=await db.execute({sql:"UPDATE jobs SET status='processing',progress=1 WHERE id=? AND status IN ('queued','uploading','failed')",args:[id]});
