@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { ensureSchema, getDb } from "@/lib/db";
+export { getDb } from "@/lib/db";
 
 export const CHUNK_BYTES = 2 * 1024 * 1024;
 export const UPLOAD_BYTES = 4 * 1024 * 1024;
