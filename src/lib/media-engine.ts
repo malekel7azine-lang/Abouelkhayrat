@@ -3,7 +3,8 @@ import { acquireTaskLock, releaseTaskLock } from "@/lib/task-lock";
 import { ProviderError } from "@/lib/provider-errors";
 import { createKieTask, getKieTask } from "@/lib/providers/kie";
 import { createCometImage, createCometVideo, getCometVideo } from "@/lib/providers/cometapi";
-import { createMergeJob, processMergeJob, getMergeJob } from "@/lib/merger";
+import { createInternalMergeJob, getInternalMergeStatus } from "@/lib/merge-store";
+import { processMerge } from "@/lib/merge-engine";
 
 type MediaKind = "image" | "video" | "merge";
 type StoredResult = { providerTaskId?: string; provider?: string; providerKeyId?: string; retryAfter?: number; processRequested?: boolean; output?: unknown; error?: string };
@@ -62,19 +63,16 @@ export async function startMediaTask(kind: "image" | "video", input: Record<stri
 export async function startMergeTask(clips: string[]): Promise<string> {
   const taskId = await createTask("merge", { clips });
   try {
-    const job = await createMergeJob(clips);
-    // Persist the returned ID before calling process so the process endpoint is never repeated.
-    await updateTask(taskId, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId, processRequested: true } });
+    const jobId = await createInternalMergeJob(clips);
+    await updateTask(taskId, { status: "processing", provider: "merger", model: "ffmpeg-turso-v2", result: { provider: "merger", providerTaskId: jobId, processRequested: true } });
     try {
-      await processMergeJob(job.jobId);
+      const result = await processMerge(jobId);
+      await updateTask(taskId, { status: "completed", result: { provider: "merger", output: { ...result, videoUrl: "/api/jobs/" + jobId + "/video", downloadUrl: "/api/jobs/" + jobId + "/video?download=1" } } });
     } catch (error) {
-      if (!(error instanceof ProviderError) || error.kind !== "temporary") {
-        await updateTask(taskId, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" });
-      }
+      await updateTask(taskId, { status: "failed", errorCode: "MERGER_PROCESS_FAILED", result: { provider: "merger", error: error instanceof Error ? error.message : "Merge failed" } });
     }
   } catch (error) {
-    if (error instanceof ProviderError && error.kind === "temporary") await setPending(taskId);
-    else await updateTask(taskId, { status: "failed", errorCode: error instanceof ProviderError ? error.kind.toUpperCase() : "MERGER_FAILED" });
+    await updateTask(taskId, { status: "failed", errorCode: error instanceof Error ? "MERGER_FAILED" : "MERGER_PROCESS_FAILED" });
   }
   return taskId;
 }
@@ -88,7 +86,7 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
     let status: { state: string; result: unknown; error?: string };
     if (task.provider === "kie") status = await getKieTask(stored.providerTaskId, stored.providerKeyId);
     else if (task.provider === "cometapi") status = await getCometVideo(stored.providerTaskId);
-    else if (task.provider === "merger") status = await getMergeJob(stored.providerTaskId);
+    else if (task.provider === "merger") { const internal = await getInternalMergeStatus(stored.providerTaskId); if (!internal) throw new ProviderError("Merge task not found", "fatal"); status = { state: internal.state, result: internal, error: internal.error }; }
     else return;
 
     if (terminalSuccess(status.state)) {
@@ -127,12 +125,10 @@ export async function getTaskWithRefresh(taskId: string): Promise<TaskRecord | n
       try { input = JSON.parse(task.input_json) as Record<string, unknown>; } catch { /* keep empty */ }
       if (task.type === "merge") {
         try {
-          const job = await createMergeJob(Array.isArray(input.clips) ? input.clips.map(String) : []);
-          await updateTask(task.id, { status: "processing", provider: "merger", model: "merger-v2", result: { provider: "merger", providerTaskId: job.jobId, processRequested: true } });
-          try { await processMergeJob(job.jobId); }
-          catch (error) {
-            if (!(error instanceof ProviderError) || error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" });
-          }
+          const jobId = await createInternalMergeJob(Array.isArray(input.clips) ? input.clips.map(String) : []);
+          await updateTask(task.id, { status: "processing", provider: "merger", model: "ffmpeg-turso-v2", result: { provider: "merger", providerTaskId: jobId, processRequested: true } });
+          try { const output = await processMerge(jobId); await updateTask(task.id, { status: "completed", result: { provider: "merger", output: { ...output, videoUrl: "/api/jobs/" + jobId + "/video" } } }); }
+          catch { await updateTask(task.id, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" }); }
         } catch (error) {
           if (error instanceof ProviderError && error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: error.kind.toUpperCase() });
           else await setPending(task.id);
