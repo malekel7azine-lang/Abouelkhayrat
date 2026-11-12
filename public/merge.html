@@ -41,5 +41,5 @@ async function poll(id){for(;;){const s=await request('/api/jobs/'+id);$('percen
 $('copy').onclick=async()=>{await navigator.clipboard.writeText(new URL($('player').src,location.href).href);$('status').textContent='تم نسخ الرابط'};
 $('new').onclick=()=>{sources=[];render();$('result').classList.add('hidden');$('progressBox').classList.add('hidden');$('status').textContent='';location.hash=''};
 async function resume(){const m=location.hash.match(/job=([\w-]+)/);if(!m)return;activeJob=m[1];$('progressBox').classList.remove('hidden');try{const s=await request('/api/jobs/'+activeJob);if(s.status==='done')showResult(s,activeJob);else if(s.status==='processing'||s.status==='queued')await poll(activeJob);else $('status').textContent=s.error||'المهمة غير متاحة'}catch(e){$('status').textContent=e.message}}
-render();resume();
+document.querySelectorAll(".docs pre").forEach(el=>{el.textContent=el.textContent.replaceAll("YOUR-DOMAIN",location.host)});render();resume();
 </script></body></html>
