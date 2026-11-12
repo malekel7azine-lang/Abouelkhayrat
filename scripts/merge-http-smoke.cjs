@@ -26,6 +26,11 @@ async function json(url,options){const r=await fetch(url,options);const body=awa
   const suffix=await fetch(base+"/api/jobs/"+id+"/video",{headers:{Range:"bytes=-100"}});assert.equal(suffix.status,206);assert.equal((await suffix.arrayBuffer()).byteLength,100);
   const deleted=await fetch(base+"/api/jobs/"+id,{method:"DELETE"});assert.equal(deleted.status,200);
   const missing=await fetch(base+"/api/jobs/"+id);assert.equal(missing.status,404);
+  const mixed=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sources:[{kind:"file",name:"local.mp4",size:fa.length,mime:"video/mp4"},{kind:"url",url:"https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4"}]})});
+  assert.equal(mixed.r.status,201);const mixedId=mixed.body.jobId;
+  const mixedUpload=await fetch(base+"/api/upload?job="+mixedId+"&seq=0&chunk=0",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:fa});assert.equal(mixedUpload.status,200);
+  const mixedProcess=await json(base+"/api/jobs/"+mixedId+"/process",{method:"POST"});assert.equal(mixedProcess.r.status,200);assert.equal(mixedProcess.body.status,"done");
+  await fetch(base+"/api/jobs/"+mixedId,{method:"DELETE"});
   const malformed=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:"{"});assert.equal(malformed.r.status,400);assert.ok(malformed.body.error);
   const empty=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({videos:[]})});assert.equal(empty.r.status,400);
   console.log("Merge HTTP smoke passed: upload chunks, Turso persistence, FFmpeg merge, output metadata, Range 206, delete/404, malformed JSON, empty sources.");
