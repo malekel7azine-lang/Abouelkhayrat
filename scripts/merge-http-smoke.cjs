@@ -17,6 +17,7 @@ async function json(url,options){const r=await fetch(url,options);const body=awa
   const fa=await fs.readFile(a),fb=await fs.readFile(b);
   let x=await json(base+"/api/jobs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({sources:[{kind:"file",name:"a.mp4",size:fa.length,mime:"video/mp4"},{kind:"file",name:"b.mp4",size:fb.length,mime:"video/mp4"}]})});
   assert.equal(x.r.status,201);const id=x.body.jobId;assert.ok(id);
+  const badChunk=await fetch(base+"/api/upload?job="+id+"&seq=0&chunk=0",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:Buffer.from("x")});assert.equal(badChunk.status,400);
   for(const [seq,buf] of [[0,fa],[1,fb]]){const up=await fetch(base+"/api/upload?job="+id+"&seq="+seq+"&chunk=0",{method:"POST",headers:{"Content-Type":"application/octet-stream"},body:buf});assert.equal(up.status,200);}
   x=await json(base+"/api/jobs/"+id+"/process",{method:"POST"});assert.equal(x.r.status,200);assert.equal(x.body.status,"done");assert.equal(x.body.resolution,"640x360");
   const full=await fetch(base+"/api/jobs/"+id+"/video");assert.equal(full.status,200);const output=Buffer.from(await full.arrayBuffer());const digest=crypto.createHash("sha256").update(output).digest("hex");assert.equal(output.length,x.body.size);
