@@ -42,6 +42,7 @@ export async function processMerge(id:string){
     const arr=await res.arrayBuffer();buf=Buffer.from(arr);
    }
    if(buf.length>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد");
+   if(s.kind==="file" && buf.length!==Number(s.size))throw new Error("لم يكتمل رفع الملف؛ أعد رفع الأجزاء الناقصة");
    await fs.writeFile(file,buf);inputs.push(file);downloaded+=buf.length;
    await setProgress(id,"processing",Math.round(40*(i+1)/total));
   }
