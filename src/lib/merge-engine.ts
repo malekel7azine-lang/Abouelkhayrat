@@ -7,6 +7,7 @@ import ffprobeStatic from "ffprobe-static";
 import { LIMITS, mergeSchema, getDb, setProgress, storeBlob, readBlob, CHUNK_BYTES } from "@/lib/merge-store";
 
 function binPath(value:string|null|undefined){ if(!value) throw new Error("FFmpeg binary is unavailable"); return value; }
+async function ensureExecutable(binary:string,name:string){const target=path.join(os.tmpdir(),name);try{await fs.access(target);await fs.chmod(target,0o755);}catch{await fs.copyFile(binary,target);await fs.chmod(target,0o755);}return target;}
 function run(bin:string,args:string[],onProgress?:(line:string)=>void){
  return new Promise<void>((resolve,reject)=>{
   const p=spawn(bin,args,{stdio:["ignore","pipe","pipe"]}); let err="";
@@ -17,7 +18,7 @@ function run(bin:string,args:string[],onProgress?:(line:string)=>void){
 }
 async function probe(file:string){
  const out=await new Promise<string>((resolve,reject)=>{
-  const p=spawn(binPath(ffprobeStatic.path),["-v","error","-show_streams","-show_format","-of","json",file],{stdio:["ignore","pipe","pipe"]});
+  const p=spawn(await ensureExecutable(binPath(ffprobeStatic.path),"ffprobe"),["-v","error","-show_streams","-show_format","-of","json",file],{stdio:["ignore","pipe","pipe"]});
   let data="",err="";p.stdout.on("data",d=>data+=d);p.stderr.on("data",d=>err+=d);p.on("error",reject);p.on("close",c=>c===0?resolve(data):reject(new Error(err)));
  });
  const x=JSON.parse(out);const v=x.streams.find((s:any)=>s.codec_type==="video");if(!v)throw new Error("Source has no video stream");
@@ -59,7 +60,7 @@ export async function processMerge(id:string){
   filters.push(concatInputs.join("")+`concat=n=${inputs.length}:v=1:a=1[outv][outa]`);
   const output=path.join(dir,"merged.mp4");
   args.push("-filter_complex",filters.join(";"),"-map","[outv]","-map","[outa]","-c:v","libx264","-preset",process.env.FFMPEG_PRESET||"medium","-crf","18","-c:a","aac","-b:a","192k","-ar","44100","-movflags","+faststart","-progress","pipe:1","-nostats",output);
-  await run(binPath(ffmpegPath),args,line=>{
+  await run(await ensureExecutable(binPath(ffmpegPath),"ffmpeg"),args,line=>{
    if(line.startsWith("out_time_us=")){const t=Number(line.slice(12))/1e6;const pct=40+Math.min(50,Math.floor(50*t/Math.max(duration,0.1)));void setProgress(id,"processing",pct);}
   });
   const stat=await fs.stat(output);if(stat.size>LIMITS.outputMaxBytes)throw new Error("حجم الفيديو الناتج يتجاوز الحد");
