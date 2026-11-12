@@ -77,3 +77,19 @@ export async function* iterateBlob(table:"source_chunks"|"output_chunks",id:stri
     if(r.rows.length<8)break;
   }
 }
+
+export async function createInternalMergeJob(urls:string[]){
+  await cleanupExpired();await mergeSchema();
+  if(urls.length<2||urls.length>LIMITS.maxSources)throw new Error("عدد روابط الفيديو يجب أن يكون بين 2 و"+LIMITS.maxSources);
+  const id=makeId(),now=Date.now(),expires=now+RETENTION_MS,db=getDb();
+  await db.execute({sql:"INSERT INTO jobs(id,status,progress,created_at,expires_at) VALUES(?,?,?,?,?)",args:[id,"queued",0,now,expires]});
+  for(let i=0;i<urls.length;i++){
+    const u=new URL(urls[i]);if(!["http:","https:"].includes(u.protocol))throw new Error("رابط الفيديو غير صالح");
+    await db.execute({sql:"INSERT INTO sources(job_id,seq,kind,url) VALUES(?,?,?,?)",args:[id,i,"url",u.toString()]});
+  }
+  return id;
+}
+export async function getInternalMergeStatus(id:string){
+  const job=await getJob(id);if(!job)return null;
+  return {state:String(job.status),progress:Number(job.progress||0),error:job.error?String(job.error):undefined,videoUrl:job.status==="done"?"/api/jobs/"+id+"/video":null,size:job.output_size?Number(job.output_size):undefined,duration:job.duration?Number(job.duration):undefined,resolution:job.width&&job.height?String(job.width)+"x"+String(job.height):undefined,expiresAt:new Date(Number(job.expires_at)).toISOString()};
+}
