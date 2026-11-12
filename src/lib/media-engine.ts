@@ -67,7 +67,9 @@ export async function startMergeTask(clips: string[]): Promise<string> {
     await updateTask(taskId, { status: "processing", provider: "merger", model: "ffmpeg-turso-v2", result: { provider: "merger", providerTaskId: jobId, processRequested: true } });
     try {
       const result = await processMerge(jobId);
-      await updateTask(taskId, { status: "completed", result: { provider: "merger", output: { ...result, videoUrl: "/api/jobs/" + jobId + "/video", downloadUrl: "/api/jobs/" + jobId + "/video?download=1" } } });
+      const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+      const origin = host ? "https://" + host : "";
+      await updateTask(taskId, { status: "completed", result: { provider: "merger", output: { ...result, videoUrl: origin + "/api/jobs/" + jobId + "/video", downloadUrl: origin + "/api/jobs/" + jobId + "/video?download=1" } } });
     } catch (error) {
       await updateTask(taskId, { status: "failed", errorCode: "MERGER_PROCESS_FAILED", result: { provider: "merger", error: error instanceof Error ? error.message : "Merge failed" } });
     }
@@ -127,7 +129,7 @@ export async function getTaskWithRefresh(taskId: string): Promise<TaskRecord | n
         try {
           const jobId = await createInternalMergeJob(Array.isArray(input.clips) ? input.clips.map(String) : []);
           await updateTask(task.id, { status: "processing", provider: "merger", model: "ffmpeg-turso-v2", result: { provider: "merger", providerTaskId: jobId, processRequested: true } });
-          try { const output = await processMerge(jobId); await updateTask(task.id, { status: "completed", result: { provider: "merger", output: { ...output, videoUrl: "/api/jobs/" + jobId + "/video" } } }); }
+          try { const output = await processMerge(jobId); const host = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL; const origin = host ? "https://" + host : ""; await updateTask(task.id, { status: "completed", result: { provider: "merger", output: { ...output, videoUrl: origin + "/api/jobs/" + jobId + "/video" } } }); }
           catch { await updateTask(task.id, { status: "failed", errorCode: "MERGER_PROCESS_FAILED" }); }
         } catch (error) {
           if (error instanceof ProviderError && error.kind !== "temporary") await updateTask(task.id, { status: "failed", errorCode: error.kind.toUpperCase() });
