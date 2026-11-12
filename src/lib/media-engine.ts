@@ -115,7 +115,12 @@ export async function getTaskWithRefresh(taskId: string): Promise<TaskRecord | n
     let task = await getTask(taskId);
     if (!task || task.status !== "processing") return task;
     const stored = parseStored(task.result_json);
-    if (stored.providerTaskId) {
+    if (task.type === "video_batch") {
+      if (!stored.retryAfter || Date.now() >= stored.retryAfter) {
+        const { refreshVideoBatch } = await import("@/lib/video-batch");
+        await refreshVideoBatch(task.id, stored as Record<string, unknown>);
+      }
+    } else if (stored.providerTaskId) {
       if (!stored.retryAfter || Date.now() >= stored.retryAfter) await refreshRemote(task, stored);
     } else if (stored.retryAfter && Date.now() >= stored.retryAfter) {
       let input: Record<string, unknown> = {};
