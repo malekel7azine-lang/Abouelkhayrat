@@ -49,8 +49,11 @@ export async function processMerge(id:string){
    if(s.kind==="file") buf=await readBlob("source_chunks",id,Number(s.seq));
    else{
     const url=await assertPublicUrl(String(s.url));
-    const res=await fetch(url,{redirect:"error"});if(!res.ok)throw new Error("تعذر تنزيل المصدر "+(i+1));
-    const arr=await res.arrayBuffer();buf=Buffer.from(arr);
+    const res=await fetch(url,{redirect:"error"});if(!res.ok||!res.body)throw new Error("تعذر تنزيل المصدر "+(i+1));
+    const declared=Number(res.headers.get("content-length")||0);if(declared>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد");
+    const parts:Buffer[]=[];let received=0;
+    for await(const part of res.body){const bytes=Buffer.from(part);received+=bytes.length;if(received>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد أثناء التنزيل");parts.push(bytes);}
+    buf=Buffer.concat(parts);
    }
    if(buf.length>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد");
    if(s.kind==="file" && buf.length!==Number(s.size))throw new Error("لم يكتمل رفع الملف؛ أعد رفع الأجزاء الناقصة");
