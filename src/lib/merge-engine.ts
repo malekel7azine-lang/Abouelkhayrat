@@ -51,8 +51,8 @@ export async function processMerge(id:string){
     const url=await assertPublicUrl(String(s.url));
     const res=await fetch(url,{redirect:"error"});if(!res.ok||!res.body)throw new Error("تعذر تنزيل المصدر "+(i+1));
     const declared=Number(res.headers.get("content-length")||0);if(declared>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد");
-    const parts:Buffer[]=[];let received=0;
-    for await(const part of res.body){const bytes=Buffer.from(part);received+=bytes.length;if(received>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد أثناء التنزيل");parts.push(bytes);}
+    const parts:Buffer[]=[];let received=0;const reader=res.body.getReader();
+    try{while(true){const item=await reader.read();if(item.done)break;const bytes=Buffer.from(item.value);received+=bytes.length;if(received>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد أثناء التنزيل");parts.push(bytes);}}finally{reader.releaseLock();}
     buf=Buffer.concat(parts);
    }
    if(buf.length>LIMITS.sourceMaxBytes)throw new Error("حجم أحد المصادر يتجاوز الحد");
