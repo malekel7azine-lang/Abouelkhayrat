@@ -1,0 +1,3 @@
+import type {NextApiRequest,NextApiResponse} from "next";
+import {LIMITS,UPLOAD_BYTES} from "@/lib/merge-store";
+export default function handler(req:NextApiRequest,res:NextApiResponse){res.setHeader("Access-Control-Allow-Origin","*");if(req.method!=="GET")return res.status(405).json({error:"طريقة الطلب غير مدعومة"});return res.status(200).json({version:"2.0.0",maxSources:LIMITS.maxSources,sourceMaxBytes:LIMITS.sourceMaxBytes,outputMaxBytes:LIMITS.outputMaxBytes,maxTotalDurationSec:LIMITS.maxDuration,uploadChunkBytes:UPLOAD_BYTES,retentionHours:24});}
