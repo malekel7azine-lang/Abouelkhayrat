@@ -50,7 +50,7 @@ export async function storeBlob(table:"source_chunks"|"output_chunks",id:string,
   for(let offset=0,chunk=0;offset<data.length;offset+=CHUNK_BYTES,chunk++){
     statements.push({sql:table==="source_chunks"?"INSERT OR REPLACE INTO source_chunks(job_id,seq,chunk,data) VALUES(?,?,?,?)":"INSERT OR REPLACE INTO output_chunks(job_id,chunk,data) VALUES(?,?,?)",args:table==="source_chunks"?[id,seq,chunk,data.subarray(offset,offset+CHUNK_BYTES)]:[id,chunk,data.subarray(offset,offset+CHUNK_BYTES)]});
   }
-  for(let i=0;i<statements.length;i+=8) await db.batch(statements.slice(i,i+8),"write");
+  for(const statement of statements) await db.execute(statement);
 }
 export async function readBlob(table:"source_chunks"|"output_chunks",id:string,seq=0):Promise<Buffer>{
   await mergeSchema(); const db=getDb(); const chunks:Buffer[]=[]; let offset=0;
