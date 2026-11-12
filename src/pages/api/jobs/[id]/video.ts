@@ -11,7 +11,7 @@ export default async function handler(req:NextApiRequest,res:NextApiResponse){
   res.setHeader("Content-Type","video/mp4");res.setHeader("Accept-Ranges","bytes");res.setHeader("Cache-Control","private, max-age=60");
   if(download)res.setHeader("Content-Disposition",'attachment; filename="merged-'+id+'.mp4"');
   let start=0,end=size-1;
-  if(range){const m=/bytes=(\d*)-(\d*)/.exec(range);if(!m)return res.status(416).end();if(m[1])start=Number(m[1]);if(m[2])end=Number(m[2]);if(start>end||start>=size){res.setHeader("Content-Range","bytes */"+size);return res.status(416).end();}end=Math.min(end,size-1);res.status(206);res.setHeader("Content-Range","bytes "+start+"-"+end+"/"+size);}else res.status(200);
+  if(range){const m=/bytes=(\d*)-(\d*)/.exec(range);if(!m)return res.status(416).end();if(!m[1]&&m[2]){const suffix=Number(m[2]);if(!suffix){res.setHeader("Content-Range","bytes */"+size);return res.status(416).end();}start=Math.max(0,size-suffix);end=size-1;}else{if(m[1])start=Number(m[1]);if(m[2])end=Number(m[2]);}if(start>end||start>=size){res.setHeader("Content-Range","bytes */"+size);return res.status(416).end();}end=Math.min(end,size-1);res.status(206);res.setHeader("Content-Range","bytes "+start+"-"+end+"/"+size);}else res.status(200);
   res.setHeader("Content-Length",String(end-start+1));
   let absolute=0;
   for await(const chunk of iterateBlob("output_chunks",id)){
