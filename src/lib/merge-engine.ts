@@ -17,8 +17,9 @@ function run(bin:string,args:string[],onProgress?:(line:string)=>void){
  });
 }
 async function probe(file:string){
+ const probeBin=await ensureExecutable(binPath(ffprobeStatic.path),"ffprobe");
  const out=await new Promise<string>((resolve,reject)=>{
-  const p=spawn(await ensureExecutable(binPath(ffprobeStatic.path),"ffprobe"),["-v","error","-show_streams","-show_format","-of","json",file],{stdio:["ignore","pipe","pipe"]});
+  const p=spawn(probeBin,["-v","error","-show_streams","-show_format","-of","json",file],{stdio:["ignore","pipe","pipe"]});
   let data="",err="";p.stdout.on("data",d=>data+=d);p.stderr.on("data",d=>err+=d);p.on("error",reject);p.on("close",c=>c===0?resolve(data):reject(new Error(err)));
  });
  const x=JSON.parse(out);const v=x.streams.find((s:any)=>s.codec_type==="video");if(!v)throw new Error("Source has no video stream");
