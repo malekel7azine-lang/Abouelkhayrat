@@ -91,5 +91,6 @@ export async function createInternalMergeJob(urls:string[]){
 }
 export async function getInternalMergeStatus(id:string){
   const job=await getJob(id);if(!job)return null;
-  return {state:String(job.status),progress:Number(job.progress||0),error:job.error?String(job.error):undefined,videoUrl:job.status==="done"?"/api/jobs/"+id+"/video":null,size:job.output_size?Number(job.output_size):undefined,duration:job.duration?Number(job.duration):undefined,resolution:job.width&&job.height?String(job.width)+"x"+String(job.height):undefined,expiresAt:new Date(Number(job.expires_at)).toISOString()};
+  const host=process.env.VERCEL_PROJECT_PRODUCTION_URL||process.env.VERCEL_URL;const origin=host?"https://"+host:"";
+  return {state:String(job.status),progress:Number(job.progress||0),error:job.error?String(job.error):undefined,videoUrl:job.status==="done"?origin+"/api/jobs/"+id+"/video":null,size:job.output_size?Number(job.output_size):undefined,duration:job.duration?Number(job.duration):undefined,resolution:job.width&&job.height?String(job.width)+"x"+String(job.height):undefined,expiresAt:new Date(Number(job.expires_at)).toISOString()};
 }
