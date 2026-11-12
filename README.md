@@ -55,3 +55,65 @@ Connect this repository to Vercel and configure the environment variables above.
 ## Standalone merger service
 
 The FFmpeg-based Merger API v2 implementation is in `merger-service/`. It supports 2–10 public video URLs, H.264/AAC MP4 output, and 24-hour job/file retention while the service remains running. Deploy it separately from Vercel; Vercel serverless functions are not used for FFmpeg processing. The included Render Blueprint can be used for an integration test, but Render's free tier sleeps after 15 minutes and discards local files on sleep/restart/redeploy. Therefore the free tier cannot guarantee 24-hour availability or retention. For reliable production merging, a continuously running container with persistent storage is required and may incur hosting costs. Set the same `MERGER_API_TOKEN` in Render and Vercel, and set `MERGER_API_BASE` in Vercel to the deployed service origin.
+
+
+## استوديو دمج الفيديوهات (Turso + FFmpeg)
+
+افتح `/merge.html` من لوحة التطبيق أو استخدم واجهة REST التالية. تعمل الواجهة ومحرك الدمج داخل المشروع نفسه، وتُحفظ بيانات المهام وملفات المصادر والناتج في جداول Turso مقسمة إلى BLOBs.
+
+### المسارات العامة
+
+| Method | Endpoint | الوظيفة |
+|---|---|---|
+| POST | `/api/jobs` | إنشاء مهمة من `videos[]` أو `sources[]` |
+| POST | `/api/upload?job=<id>&seq=<n>&chunk=<k>` | رفع جزء ثنائي حتى 4MB |
+| POST | `/api/jobs/<id>/process` | تنفيذ FFmpeg |
+| GET | `/api/jobs/<id>` | الحالة والتقدم والنتيجة |
+| GET | `/api/jobs/<id>/video` | تشغيل الفيديو وطلبات Range |
+| DELETE | `/api/jobs/<id>` | حذف المهمة وبياناتها |
+| GET | `/api/config` | حدود الخدمة |
+| GET | `/api/cron` | تنظيف المهام المنتهية (Vercel Cron) |
+
+### مثال سريع
+
+```bash
+curl -X POST https://YOUR-DOMAIN/api/jobs \
+  -H 'Content-Type: application/json' \
+  -d '{"videos":["https://cdn.example/a.mp4","https://cdn.example/b.mp4"]}'
+```
+
+استخدم `jobId` الناتج في:
+```bash
+curl -X POST https://YOUR-DOMAIN/api/jobs/JOB_ID/process
+curl https://YOUR-DOMAIN/api/jobs/JOB_ID
+curl -H 'Range: bytes=0-1048575' https://YOUR-DOMAIN/api/jobs/JOB_ID/video -o preview.mp4
+curl -L 'https://YOUR-DOMAIN/api/jobs/JOB_ID/video?download=1' -o merged.mp4
+curl -X DELETE https://YOUR-DOMAIN/api/jobs/JOB_ID
+```
+
+### متغيرات البيئة
+
+| المتغير | الافتراضي | الوصف |
+|---|---:|---|
+| `TURSO_DATABASE_URL` | — | رابط قاعدة Turso (إلزامي) |
+| `TURSO_AUTH_TOKEN` | — | رمز Turso (إلزامي) |
+| `MAX_SOURCES` | 10 | أقصى عدد مصادر |
+| `SOURCE_MAX_MB` | 200 | الحد الأقصى لكل مصدر |
+| `OUTPUT_MAX_MB` | 150 | الحد الأقصى للناتج |
+| `MAX_TOTAL_DURATION_SEC` | 600 | مجموع المدد |
+| `FFMPEG_PRESET` | medium | إعداد سرعة/ضغط H.264 |
+| `CRON_SECRET` | — | حماية استدعاء cron عند ضبطه |
+
+### حدود تشغيل مهمة
+
+- دالة Vercel مضبوطة على `maxDuration: 300`، لكن هذا لا يعني أن كل حساب أو خطة يسمحان بخمس دقائق؛ سقف التنفيذ الفعلي تابع لخطة Vercel وإعداداتها.
+- FFmpeg يعمل داخل دالة Serverless ويستهلك CPU وذاكرة ووقت تنفيذ. عمليات الدمج الطويلة أو الكبيرة قد تتجاوز سقف المنصة وتفشل؛ لا يُعد هذا بديلاً مضموناً عن عامل معالجة دائم.
+- كل طلب رفع مقسم إلى أجزاء 4MB، ثم تحفظ الأجزاء في صفوف Turso بحجم 2MB. الناتج يقسم أيضاً إلى 2MB.
+- الفيديو الناتج يستهلك مساحة قاعدة Turso وعمليات كتابة/قراءة؛ راجع حصة قاعدة البيانات وخطة Turso الحالية قبل رفع ملفات كبيرة.
+- مدة الاحتفاظ 24 ساعة، لكن التنظيف الفعلي يعتمد على الطلبات اللاحقة أو Cron. لا توجد ضمانة حذف لحظية عند تعطل Cron.
+- واجهة الدمج تقبل روابط عامة. لا ترسل روابط خاصة أو روابط تتطلب جلسة دخول.
+- لا تضع أسرار Turso في المستودع. أضف المتغيرين في Vercel Project Settings → Environment Variables ثم أعد النشر.
+
+### التكامل مع MCP
+
+أداة `merge_videos` الحالية تنشئ مهمة دمج من روابط فيديو عامة. الدمج التلقائي بعد سلسلة توليد متعددة يحتاج أداة orchestration إضافية تتحقق من اكتمال كل مهمة فرعية واستخراج روابط نتائجها قبل بدء الدمج؛ لا تستخدم رابطاً غير مكتمل أو نتيجة جزئية.
