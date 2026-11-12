@@ -7,7 +7,7 @@ import { createInternalMergeJob, getInternalMergeStatus } from "@/lib/merge-stor
 import { processMerge } from "@/lib/merge-engine";
 
 type MediaKind = "image" | "video" | "merge";
-type StoredResult = { providerTaskId?: string; provider?: string; providerKeyId?: string; retryAfter?: number; processRequested?: boolean; output?: unknown; error?: string };
+type StoredResult = { providerTaskId?: string; provider?: string; providerKeyId?: string; retryAfter?: number; processRequested?: boolean; output?: unknown; error?: string; stage?: string; childTaskIds?: string[]; mergeTaskId?: string };
 
 function parseStored(value: string | null): StoredResult {
   if (!value) return {};
@@ -148,7 +148,7 @@ export function publicTask(task: TaskRecord) {
   const stored = parseStored(task.result_json);
   return {
     id: task.id, type: task.type, status: task.status, provider: task.provider, model: task.model,
-    result: stored.output ?? (task.type === "video_batch" ? { stage: (stored as Record<string, unknown>).stage || "generating", child_task_ids: (stored as Record<string, unknown>).childTaskIds || [] } : null), error_code: task.error_code,
+    result: stored.output ?? (task.type === "video_batch" ? { stage: stored.stage || "generating", child_task_ids: stored.childTaskIds || [] } : null), error_code: task.error_code,
     created_at: task.created_at, updated_at: task.updated_at
   };
 }
