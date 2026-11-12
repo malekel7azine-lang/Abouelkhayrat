@@ -148,7 +148,7 @@ export function publicTask(task: TaskRecord) {
   const stored = parseStored(task.result_json);
   return {
     id: task.id, type: task.type, status: task.status, provider: task.provider, model: task.model,
-    result: stored.output ?? null, error_code: task.error_code,
+    result: stored.output ?? (task.type === "video_batch" ? { stage: (stored as Record<string, unknown>).stage || "generating", child_task_ids: (stored as Record<string, unknown>).childTaskIds || [] } : null), error_code: task.error_code,
     created_at: task.created_at, updated_at: task.updated_at
   };
 }
