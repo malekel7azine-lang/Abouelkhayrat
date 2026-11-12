@@ -16,7 +16,7 @@ async function assertPublicUrl(raw:string){
  for(const record of records){const ip=record.address.toLowerCase();if(net.isIPv4(ip)){const [a,b]=ip.split(".").map(Number);if(a===0||a===10||a===127||a>=224||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||(a===100&&b>=64&&b<=127))throw new Error("تم رفض عنوان شبكة خاصة");}else if(ip==="::"||ip==="::1"||ip.startsWith("fc")||ip.startsWith("fd")||/^fe[89ab]/.test(ip)||ip.startsWith("::ffff:127.")||ip.startsWith("::ffff:10."))throw new Error("تم رفض عنوان شبكة خاصة");}
  return u;
 }
-async function ensureExecutable(binary:string,name:string){const target=path.join(os.tmpdir(),name);try{await fs.access(target);await fs.chmod(target,0o755);}catch{await fs.copyFile(binary,target);await fs.chmod(target,0o755);}return target;}
+async function ensureExecutable(binary:string,name:string,dir:string){const target=path.join(dir,name);try{await fs.access(target);await fs.chmod(target,0o755);}catch{await fs.copyFile(binary,target);await fs.chmod(target,0o755);}return target;}
 function run(bin:string,args:string[],onProgress?:(line:string)=>void){
  return new Promise<void>((resolve,reject)=>{
   const p=spawn(bin,args,{stdio:["ignore","pipe","pipe"]}); let err="";
@@ -25,8 +25,8 @@ function run(bin:string,args:string[],onProgress?:(line:string)=>void){
   p.on("error",reject); p.on("close",code=>code===0?resolve():reject(new Error(err||"FFmpeg execution failed")));
  });
 }
-async function probe(file:string){
- const probeBin=await ensureExecutable(binPath(ffprobeStatic.path),"ffprobe");
+async function probe(file:string,dir:string){
+ const probeBin=await ensureExecutable(binPath(ffprobeStatic.path),"ffprobe",dir);
  const out=await new Promise<string>((resolve,reject)=>{
   const p=spawn(probeBin,["-v","error","-show_streams","-show_format","-of","json",file],{stdio:["ignore","pipe","pipe"]});
   let data="",err="";p.stdout.on("data",d=>data+=d);p.stderr.on("data",d=>err+=d);p.on("error",reject);p.on("close",c=>c===0?resolve(data):reject(new Error(err)));
@@ -61,7 +61,7 @@ export async function processMerge(id:string){
    await fs.writeFile(file,buf);inputs.push(file);downloaded+=buf.length;
    await setProgress(id,"processing",Math.round(40*(i+1)/total));
   }
-  const metadata=[];for(const f of inputs)metadata.push(await probe(f));
+  const metadata=[];for(const f of inputs)metadata.push(await probe(f,dir));
   const duration=metadata.reduce((a,b)=>a+b.duration,0);if(duration>LIMITS.maxDuration)throw new Error("المدة الإجمالية تتجاوز الحد المسموح");
   const width=Math.min(1920,Math.max(...metadata.map(x=>x.width)));const height=Math.min(1080,Math.max(...metadata.map(x=>x.height)));
   const w=width%2?width-1:width,h=height%2?height-1:height;
@@ -76,7 +76,7 @@ export async function processMerge(id:string){
   filters.push(concatInputs.join("")+`concat=n=${inputs.length}:v=1:a=1[outv][outa]`);
   const output=path.join(dir,"merged.mp4");
   args.push("-filter_complex",filters.join(";"),"-map","[outv]","-map","[outa]","-c:v","libx264","-preset",process.env.FFMPEG_PRESET||"medium","-crf","18","-c:a","aac","-b:a","192k","-ar","44100","-movflags","+faststart","-progress","pipe:1","-nostats",output);
-  await run(await ensureExecutable(binPath(ffmpegPath),"ffmpeg"),args,line=>{
+  await run(await ensureExecutable(binPath(ffmpegPath),"ffmpeg",dir),args,line=>{
    if(line.startsWith("out_time_us=")){const t=Number(line.slice(12))/1e6;const pct=40+Math.min(50,Math.floor(50*t/Math.max(duration,0.1)));void setProgress(id,"processing",pct);}
   });
   const stat=await fs.stat(output);if(stat.size>LIMITS.outputMaxBytes)throw new Error("حجم الفيديو الناتج يتجاوز الحد");
