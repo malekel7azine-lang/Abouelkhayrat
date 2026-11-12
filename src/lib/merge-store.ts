@@ -40,7 +40,7 @@ export async function deleteJob(id:string){
 }
 export async function getJob(id:string){
   await mergeSchema(); const r=await getDb().execute({sql:"SELECT * FROM jobs WHERE id = ?",args:[id]});
-  return r.rows[0] || null;
+  const job=r.rows[0]||null;if(job&&Number(job.expires_at)<=Date.now()){await deleteJob(id);return null;}return job;
 }
 export async function setProgress(id:string,status:string,progress:number,error?:string){
   await mergeSchema(); await getDb().execute({sql:"UPDATE jobs SET status=?,progress=?,error=? WHERE id=?",args:[status,progress,error||null,id]});
