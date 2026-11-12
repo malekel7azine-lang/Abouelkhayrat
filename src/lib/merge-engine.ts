@@ -2,11 +2,20 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import dns from "node:dns/promises";
+import net from "node:net";
 import ffmpegPath from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
 import { LIMITS, mergeSchema, getDb, setProgress, storeBlob, readBlob, CHUNK_BYTES } from "@/lib/merge-store";
 
 function binPath(value:string|null|undefined){ if(!value) throw new Error("FFmpeg binary is unavailable"); return value; }
+async function assertPublicUrl(raw:string){
+ const u=new URL(raw);if(!["http:","https:"].includes(u.protocol)||u.username||u.password)throw new Error("رابط المصدر غير صالح");
+ const host=u.hostname.toLowerCase();if(host==="localhost"||host.endsWith(".localhost")||host.endsWith(".local"))throw new Error("لا يسمح بعناوين الشبكة المحلية");
+ const records=net.isIP(host)?[{address:host}]:await dns.lookup(host,{all:true,verbatim:true});
+ for(const record of records){const ip=record.address.toLowerCase();if(net.isIPv4(ip)){const [a,b]=ip.split(".").map(Number);if(a===0||a===10||a===127||a>=224||(a===169&&b===254)||(a===172&&b>=16&&b<=31)||(a===192&&b===168)||(a===100&&b>=64&&b<=127))throw new Error("تم رفض عنوان شبكة خاصة");}else if(ip==="::"||ip==="::1"||ip.startsWith("fc")||ip.startsWith("fd")||/^fe[89ab]/.test(ip)||ip.startsWith("::ffff:127.")||ip.startsWith("::ffff:10."))throw new Error("تم رفض عنوان شبكة خاصة");}
+ return u;
+}
 async function ensureExecutable(binary:string,name:string){const target=path.join(os.tmpdir(),name);try{await fs.access(target);await fs.chmod(target,0o755);}catch{await fs.copyFile(binary,target);await fs.chmod(target,0o755);}return target;}
 function run(bin:string,args:string[],onProgress?:(line:string)=>void){
  return new Promise<void>((resolve,reject)=>{
@@ -38,7 +47,7 @@ export async function processMerge(id:string){
    const s=sources.rows[i];const file=path.join(dir,"input-"+i+".mp4");let buf:Buffer;
    if(s.kind==="file") buf=await readBlob("source_chunks",id,Number(s.seq));
    else{
-    const url=new URL(String(s.url));if(!["http:","https:"].includes(url.protocol))throw new Error("رابط المصدر غير صالح");
+    const url=await assertPublicUrl(String(s.url));
     const res=await fetch(url,{redirect:"error"});if(!res.ok)throw new Error("تعذر تنزيل المصدر "+(i+1));
     const arr=await res.arrayBuffer();buf=Buffer.from(arr);
    }
