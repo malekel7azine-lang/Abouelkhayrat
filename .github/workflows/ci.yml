@@ -16,6 +16,8 @@ jobs:
       - name: Dependency security audit
         run: npm audit --audit-level=moderate
       - run: npm run typecheck
+      - name: FFmpeg merge integration test
+        run: npm run test:merger
       - run: npm run build
         env:
           TURSO_DATABASE_URL: file:./ci.db
