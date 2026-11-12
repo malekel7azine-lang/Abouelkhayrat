@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "dev:local": "node scripts/dev-server.cjs",
+    "test:merger": "node --test scripts/merger.test.cjs"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",
@@ -15,7 +17,9 @@
     "next": "^15.5.6",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "zod": "^4.6.7"
+    "zod": "^4.6.7",
+    "ffmpeg-static": "^5.2.0",
+    "ffprobe-static": "^3.1.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.14",
