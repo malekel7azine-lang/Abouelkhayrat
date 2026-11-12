@@ -66,6 +66,7 @@ Connect this repository to Vercel and configure the environment variables above.
 | GET | `/api/jobs/<id>/video` | تشغيل الفيديو وطلبات Range |
 | DELETE | `/api/jobs/<id>` | حذف المهمة وبياناتها |
 | GET | `/api/config` | حدود الخدمة |
+| GET | `/api/merge-health` | فحص Turso وFFmpeg بعد النشر |
 | GET | `/api/cron` | تنظيف المهام المنتهية (Vercel Cron) |
 
 ### مثال سريع
