@@ -73,7 +73,7 @@ export async function* iterateBlob(table:"source_chunks"|"output_chunks",id:stri
       ? await db.execute({sql:"SELECT chunk,data FROM source_chunks WHERE job_id=? AND seq=? AND chunk>=? ORDER BY chunk LIMIT 8",args:[id,seq,offset]})
       : await db.execute({sql:"SELECT chunk,data FROM output_chunks WHERE job_id=? AND chunk>=? ORDER BY chunk LIMIT 8",args:[id,offset]});
     if(!r.rows.length)break;
-    for(const row of r.rows){offset=Number(row.chunk)+1;yield Buffer.from(row.data as Uint8Array);}
+    for(const row of r.rows){offset=Number(row.chunk)+1;yield Buffer.from(row.data as unknown as ArrayBuffer);}
     if(r.rows.length<8)break;
   }
 }
