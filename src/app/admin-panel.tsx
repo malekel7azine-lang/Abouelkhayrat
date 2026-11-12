@@ -79,7 +79,7 @@ export default function AdminPanel() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">Kie.ai</p><p className={config.kieConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.kieConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
         <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">CometAPI</p><p className={config.cometapiConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.cometapiConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
-        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">محرك FFmpeg الداخلي</p><p className={config.mergeConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.mergerConfigured ? "مُعدّ" : "يحتاج إعداد Turso"}</p></div>
+        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">محرك FFmpeg الداخلي</p><p className={config.mergeConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.mergeConfigured ? "مُعدّ" : "يحتاج إعداد Turso"}</p></div>
       </div>
     </section>}
 
