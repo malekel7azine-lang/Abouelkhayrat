@@ -43,7 +43,7 @@ Generation is asynchronous. The initial call returns a task ID. Use `get_task` t
 npm install
 npm run typecheck
 npm run build
-npm run dev
+npm run dev:local
 ```
 
 ## Deployment
