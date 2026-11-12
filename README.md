@@ -116,3 +116,12 @@ curl -X DELETE https://YOUR-DOMAIN/api/jobs/JOB_ID
 ### توليد عدة مقاطع ودمجها تلقائياً عبر MCP
 
 أضيفت أداة `generate_video_batch`: ترسل لها مصفوفة مرتبة من 2 إلى 10 أوصاف، فينشئ التطبيق مهام الفيديو الفرعية، ويتابعها عبر `get_task`. عندما تكتمل جميع المقاطع، يستخرج روابطها بالترتيب نفسه ويبدأ مهمة الدمج تلقائياً. إذا فشل أي مقطع، تتوقف السلسلة ولا يتم إنتاج فيديو ناقص. استخدم `get_task` على معرّف المهمة الأب حتى تصل الحالة إلى `completed` أو `failed`.
+
+### حدود الخطط المجانية (تحقق: نوفمبر 2026)
+
+- **Vercel Functions:** مع Fluid Compute، الحد الأقصى المعلن لخطة Hobby هو 300 ثانية لكل استدعاء، والذاكرة القصوى 2GB. إذا كان Fluid Compute معطلاً، يكون سقف Hobby أقل (60 ثانية). معالجة الفيديو تستهلك CPU وذاكرة، وقد تتجاوز الحصة المجانية للاستخدام إذا زاد حجم التشغيل.
+- **Vercel request body:** الحد الأقصى 4.5MB؛ لذلك تعتمد الواجهة أجزاء 4MB. الحد القياسي لحجم Function غير المضغوط 250MB، وتُضمّن ملفات FFmpeg عبر output tracing.
+- **Turso Free:** 5GB تخزين، و500 مليون صف مقروء، و10 ملايين صف مكتوب شهرياً، حتى 100 قاعدة بيانات. كل جزء فيديو محفوظ كصف BLOB مستقل؛ راقب مساحة التخزين وعدد الصفوف المكتوبة.
+- لا يوجد Render أو Vercel Blob أو S3 أو خدمة معالجة خارجية في مسار الدمج الحالي.
+
+المراجع الرسمية: [Vercel Function limits](https://vercel.com/docs/functions/limitations) · [Vercel duration](https://vercel.com/docs/functions/configuring-functions/duration) · [Turso pricing](https://turso.tech/pricing)
