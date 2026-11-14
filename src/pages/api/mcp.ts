@@ -21,7 +21,7 @@ function authorized(req: NextApiRequest): boolean {
 function createServer() {
   const server = new McpServer({ name: "mcp-media-generator", version: "1.1.0" });
 
-  server.tool("generate_image", "Create an asynchronous image generation task using Kie.ai with CometAPI fallback. Use get_task to retrieve its result.", {
+  server.tool("generate_image", "Create an image generation task. Pollinations is tried first when configured, then Kie.ai and CometAPI. Use get_task to retrieve its result.", {
     prompt: z.string().min(1).max(32000),
     model: z.string().optional(),
     aspect_ratio: z.string().optional(),
@@ -38,7 +38,7 @@ function createServer() {
     }
   });
 
-  server.tool("generate_video", "Create an asynchronous video generation task using Kie.ai with CometAPI fallback. Use get_task to retrieve its result.", {
+  server.tool("generate_video", "Create a video generation task. Pollinations is tried first when configured, then Kie.ai and CometAPI. Use get_task to retrieve its result.", {
     prompt: z.string().min(1).max(4096),
     model: z.string().optional(),
     duration: z.number().int().min(1).max(15).optional(),
