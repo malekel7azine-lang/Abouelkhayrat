@@ -7,7 +7,7 @@ Next.js application exposing image generation, video generation, video merging, 
 - Next.js 15 App Router + TypeScript
 - Official Model Context Protocol SDK (Streamable HTTP)
 - Turso / libSQL
-- Kie.ai and CometAPI provider adapters
+- Pollinations, Kie.ai and CometAPI provider adapters
 - Integrated FFmpeg video merge engine with Turso BLOB storage
 
 ## Environment
@@ -18,7 +18,7 @@ Configure these values in Vercel (never commit real credentials):
 - `MCP_AUTH_TOKEN` (required to protect the MCP endpoint)
 - `ADMIN_API_TOKEN` (optional; defaults to MCP_AUTH_TOKEN for dashboard administration)
 - `API_KEY_ENCRYPTION_SECRET` (optional dedicated AES-256 key; defaults to the Turso auth token)
-- `KIE_API_KEY`, `COMETAPI_API_KEY` (optional fallback keys; additional ordered keys can be managed in the dashboard)
+- `POLLINATIONS_KEY` (or `POLLINATIONS_API_KEY`), `KIE_API_KEY`, `COMETAPI_API_KEY` (optional provider keys; Pollinations is attempted first, then Kie.ai and CometAPI)
 - Optional model/base URL overrides are listed in `.env.example`.
 
 Provider keys entered through the dashboard are encrypted with AES-256-GCM before being stored in Turso and are never returned by the API; only masked hints are displayed. Set `API_KEY_ENCRYPTION_SECRET` before adding provider keys if you want a dedicated encryption secret; otherwise the Turso auth token is used as the stable fallback. Do not change the encryption secret after saving keys unless you first re-encrypt the stored keys. Keep database credentials and provider keys private.
@@ -33,6 +33,7 @@ Generation is asynchronous. The initial call returns a task ID. Use `get_task` t
 
 ## Provider behavior
 
+- Pollinations uses `POST /v1/images/generations` for images and `GET /video/{prompt}` with `Prefer: respond-async`, then polls `GET /v1/jobs/{id}` for videos. Configure `POLLINATIONS_KEY` in Vercel; the integration also accepts the legacy exact spelling `Pollinations_key`.
 - Kie.ai uses `POST /api/v1/jobs/createTask` and `GET /api/v1/jobs/recordInfo?taskId=...`.
 - CometAPI image generation uses `POST /v1/images/generations` (default model `gpt-image-2.6-flare`); Grok Imagine Video 1.5 uses `POST /grok/v1/videos/generations` and polls `GET /grok/v1/videos/{request_id}` (default model `grok-imagine-video-1.5`).
 - API keys are attempted in `created_at ASC, id ASC` order. Unauthorized keys are disabled; insufficient-credit keys are marked exhausted but remain retryable; temporary failures fall through to the next key; parameter errors stop the attempt.
