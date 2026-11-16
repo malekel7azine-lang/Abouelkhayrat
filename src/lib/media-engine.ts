@@ -4,6 +4,7 @@ import { ProviderError } from "@/lib/provider-errors";
 import { createKieTask, getKieTask } from "@/lib/providers/kie";
 import { createCometImage, createCometVideo, getCometVideo } from "@/lib/providers/cometapi";
 import { createPollinationsImage, createPollinationsVideo, getPollinationsVideo } from "@/lib/providers/pollinations";
+import { tryCustomImageProviders } from "@/lib/custom-provider-engine";
 import { createInternalMergeJob, getInternalMergeStatus } from "@/lib/merge-store";
 import { processMerge } from "@/lib/merge-engine";
 
@@ -25,6 +26,13 @@ async function beginWithFallback(taskId: string, kind: "image" | "video", input:
   let lastError: ProviderError | undefined;
   for (const provider of providers) {
     try {
+      if (kind === "image" && provider === "pollinations") {
+        const custom = await tryCustomImageProviders(input);
+        if (custom) {
+          await updateTask(taskId, { status: "completed", provider: "custom", model: String(input.model || "custom-openai-compatible"), result: { provider: custom.provider, output: custom.output } });
+          return;
+        }
+      }
       if (provider === "pollinations" && (process.env.POLLINATIONS_KEY || process.env.Pollinations_key || process.env.POLLINATIONS_API_KEY)) {
         if (kind === "image") {
           const output = await createPollinationsImage(input);
