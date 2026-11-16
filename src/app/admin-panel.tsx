@@ -1,112 +1,34 @@
 "use client";
-
-import { useCallback, useState } from "react";
-
-type KeyRow = { id: string; provider: "kie" | "cometapi"; label: string; status: string; masked: string };
-type TaskRow = { id: string; type: string; status: string; provider: string | null; model: string | null; created_at: string };
-type ConfigState = { kieConfigured: boolean; cometapiConfigured: boolean; mergeConfigured: boolean };
-
-export default function AdminPanel() {
-  const [token, setToken] = useState("");
-  const [keys, setKeys] = useState<KeyRow[]>([]);
-  const [tasks, setTasks] = useState<TaskRow[]>([]);
-  const [config, setConfig] = useState<ConfigState | null>(null);
-  const [provider, setProvider] = useState<"kie" | "cometapi">("kie");
-  const [label, setLabel] = useState("");
-  const [secret, setSecret] = useState("");
-  const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const headers = { "x-admin-token": token, "Content-Type": "application/json" };
-  const refresh = useCallback(async () => {
-    if (!token) { setMessage("أدخل رمز الإدارة أولاً."); return; }
-    setBusy(true);
-    try {
-      const [keyResponse, taskResponse] = await Promise.all([
-        fetch("/api/admin/keys", { headers, cache: "no-store" }),
-        fetch("/api/tasks?limit=20", { headers, cache: "no-store" })
-      ]);
-      if (keyResponse.status === 401 || taskResponse.status === 401) throw new Error("رمز الإدارة غير صحيح.");
-      if (!keyResponse.ok || !taskResponse.ok) throw new Error("تعذر تحميل بيانات لوحة الإدارة.");
-      const keyData = await keyResponse.json();
-      const taskData = await taskResponse.json();
-      setKeys(keyData.keys || []);
-      setConfig(keyData.config || null);
-      setTasks(taskData.tasks || []);
-      setMessage("تم تحديث البيانات.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "حدث خطأ."); }
-    finally { setBusy(false); }
-  }, [token]);
-
-  async function addKey(event: React.FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    try {
-      const response = await fetch("/api/admin/keys", { method: "POST", headers, body: JSON.stringify({ provider, label: label || provider, secret }) });
-      if (!response.ok) throw new Error("تعذر إضافة المفتاح. تحقق من رمز الإدارة والبيانات.");
-      setSecret(""); setLabel(""); setMessage("تمت إضافة المفتاح.");
-      await refresh();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "حدث خطأ."); }
-    finally { setBusy(false); }
-  }
-
-  async function updateKey(id: string, action: "active" | "disabled" | "delete") {
-    setBusy(true);
-    try {
-      const response = await fetch("/api/admin/keys/" + encodeURIComponent(id), {
-        method: action === "delete" ? "DELETE" : "PATCH",
-        headers,
-        ...(action === "delete" ? {} : { body: JSON.stringify({ status: action }) })
-      });
-      if (!response.ok) throw new Error("تعذر تحديث المفتاح.");
-      await refresh();
-    } catch (error) { setMessage(error instanceof Error ? error.message : "حدث خطأ."); }
-    finally { setBusy(false); }
-  }
-
-  return <div className="space-y-6">
-    <section className="panel space-y-4">
-      <div><h2 className="text-xl font-semibold">إدارة المفاتيح ومهام الإنتاج</h2><p className="muted mt-1 text-sm">رمز الإدارة هو ADMIN_API_TOKEN، أو MCP_AUTH_TOKEN إذا لم يتم ضبط رمز إدارة مستقل. لا تشارك هذا الرمز.</p></div>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <input className="field min-w-0 flex-1" type="password" autoComplete="off" placeholder="رمز الإدارة" value={token} onChange={e => setToken(e.target.value)} />
-        <button className="action" onClick={refresh} disabled={busy}>تحديث البيانات</button>
-      </div>
-      {message && <p className="text-sm text-cyan-200">{message}</p>}
-    </section>
-
-    {config && <section className="panel space-y-3">
-      <h2 className="text-xl font-semibold">حالة إعداد الخدمات</h2>
-      <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">Kie.ai</p><p className={config.kieConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.kieConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
-        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">CometAPI</p><p className={config.cometapiConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.cometapiConfigured ? "مُعدّ" : "يحتاج مفتاحاً"}</p></div>
-        <div className="rounded-xl border border-slate-700 p-3"><p className="muted text-sm">محرك FFmpeg الداخلي</p><p className={config.mergeConfigured ? "mt-2 text-emerald-300" : "mt-2 text-amber-300"}>{config.mergeConfigured ? "مُعدّ" : "يحتاج إعداد Turso"}</p></div>
-      </div>
-    </section>}
-
-    <section className="panel space-y-4">
-      <div><h2 className="text-xl font-semibold">إضافة مفتاح مزود</h2><p className="muted mt-1 text-sm">المفتاح يُرسل إلى الخادم فقط، ولا يُعاد عرضه بعد الحفظ.</p></div>
-      <form onSubmit={addKey} className="grid gap-3 md:grid-cols-2">
-        <select className="field" value={provider} onChange={e => setProvider(e.target.value as "kie" | "cometapi")}><option value="kie">Kie.ai</option><option value="cometapi">CometAPI</option></select>
-        <input className="field" placeholder="اسم وصفي (اختياري)" value={label} onChange={e => setLabel(e.target.value)} />
-        <input className="field md:col-span-2" type="password" autoComplete="new-password" placeholder="API key" value={secret} onChange={e => setSecret(e.target.value)} required />
-        <button className="action md:col-span-2" disabled={busy || !token || !secret}>حفظ المفتاح</button>
-      </form>
-    </section>
-
-    <section className="panel space-y-3">
-      <h2 className="text-xl font-semibold">مفاتيح API</h2>
-      {keys.length === 0 ? <p className="muted text-sm">لا توجد مفاتيح محفوظة في قاعدة البيانات. قد تكون مفاتيح البيئة مستخدمة عند توفرها.</p> :
-        <div className="overflow-x-auto"><table className="w-full text-right text-sm"><thead><tr className="muted border-b border-slate-700"><th className="p-2">المزود</th><th className="p-2">الاسم</th><th className="p-2">الحالة</th><th className="p-2">إجراء</th></tr></thead><tbody>
-          {keys.map(key => <tr key={key.id} className="border-b border-slate-800"><td className="p-2">{key.provider}</td><td className="p-2">{key.label}<div className="muted text-xs">{key.masked}</div></td><td className="p-2">{key.status}</td><td className="flex flex-wrap gap-2 p-2"><button className="subaction" onClick={() => updateKey(key.id, key.status === "active" ? "disabled" : "active")}>{key.status === "active" ? "تعطيل" : "إعادة تفعيل"}</button>{!key.id.startsWith("env-") && <button className="subaction danger" onClick={() => updateKey(key.id, "delete")}>حذف</button>}</td></tr>)}
-        </tbody></table></div>}
-    </section>
-
-    <section className="panel space-y-3">
-      <h2 className="text-xl font-semibold">آخر المهام</h2>
-      {tasks.length === 0 ? <p className="muted text-sm">لا توجد مهام حتى الآن.</p> :
-        <div className="overflow-x-auto"><table className="w-full text-right text-sm"><thead><tr className="muted border-b border-slate-700"><th className="p-2">Task ID</th><th className="p-2">النوع</th><th className="p-2">الحالة</th><th className="p-2">المزود</th></tr></thead><tbody>
-          {tasks.map(task => <tr key={task.id} className="border-b border-slate-800"><td className="p-2 font-mono text-xs">{task.id.slice(0, 12)}…</td><td className="p-2">{task.type}</td><td className="p-2">{task.status}</td><td className="p-2">{task.provider || "—"}</td></tr>)}
-        </tbody></table></div>}
-    </section>
-  </div>;
+import { useCallback,useState } from "react";
+type KeyRow={id:string;provider:string;label:string;status:string;masked:string};
+type TaskRow={id:string;type:string;status:string;provider:string|null;model:string|null};
+type CustomProvider={id:string;name:string;base_url:string;image_model:string;enabled:boolean;masked:string};
+export default function AdminPanel(){
+ const [token,setToken]=useState(""),[keys,setKeys]=useState<KeyRow[]>([]),[tasks,setTasks]=useState<TaskRow[]>([]),[providers,setProviders]=useState<CustomProvider[]>([]);
+ const [provider,setProvider]=useState("kie"),[label,setLabel]=useState(""),[secret,setSecret]=useState("");
+ const [name,setName]=useState(""),[baseUrl,setBaseUrl]=useState(""),[model,setModel]=useState(""),[apiKey,setApiKey]=useState("");
+ const [message,setMessage]=useState(""),[busy,setBusy]=useState(false);
+ const headers={"x-admin-token":token,"Content-Type":"application/json"};
+ const refresh=useCallback(async()=>{
+  if(!token){setMessage("أدخل رمز الإدارة أولاً.");return;}setBusy(true);
+  try{
+   const [kr,tr,pr]=await Promise.all([fetch("/api/admin/keys",{headers,cache:"no-store"}),fetch("/api/tasks?limit=20",{headers,cache:"no-store"}),fetch("/api/admin/providers",{headers,cache:"no-store"})]);
+   if([kr,tr,pr].some(r=>r.status===401))throw new Error("رمز الإدارة غير صحيح.");
+   if(!kr.ok||!tr.ok||!pr.ok)throw new Error("تعذر تحميل البيانات.");
+   const [k,t,p]=await Promise.all([kr.json(),tr.json(),pr.json()]);
+   setKeys(k.keys||[]);setTasks(t.tasks||[]);setProviders(p.providers||[]);setMessage("تم تحديث البيانات.");
+  }catch(e){setMessage(e instanceof Error?e.message:"حدث خطأ");}finally{setBusy(false);}
+ },[token]);
+ async function addKey(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await fetch("/api/admin/keys",{method:"POST",headers,body:JSON.stringify({provider,label:label||provider,secret})});if(!r.ok)throw new Error("تعذر إضافة المفتاح");setSecret("");setLabel("");await refresh();}catch(e){setMessage(e instanceof Error?e.message:"حدث خطأ");}finally{setBusy(false);}}
+ async function saveProvider(e:React.FormEvent){e.preventDefault();setBusy(true);try{const r=await fetch("/api/admin/providers",{method:"POST",headers,body:JSON.stringify({name,baseUrl,imageModel:model,apiKey})});const d=await r.json();if(!r.ok)throw new Error(d.error||"تعذر حفظ المولّد");setName("");setBaseUrl("");setModel("");setApiKey("");setMessage("تم حفظ المولّد وتشفير مفتاحه.");await refresh();}catch(e){setMessage(e instanceof Error?e.message:"حدث خطأ");}finally{setBusy(false);}}
+ async function providerAction(id:string,action:"toggle"|"delete",enabled?:boolean){if(action==="delete"&&!window.confirm("حذف هذا المولّد؟"))return;setBusy(true);try{const r=await fetch("/api/admin/providers/"+encodeURIComponent(id),{method:action==="delete"?"DELETE":"PATCH",headers,...(action==="toggle"?{body:JSON.stringify({enabled})}:{})});if(!r.ok)throw new Error();await refresh();}catch{setMessage("تعذر تنفيذ الإجراء");}finally{setBusy(false);}}
+ async function keyAction(id:string,action:"active"|"disabled"|"delete"){setBusy(true);try{const r=await fetch("/api/admin/keys/"+encodeURIComponent(id),{method:action==="delete"?"DELETE":"PATCH",headers,...(action==="delete"?{}:{body:JSON.stringify({status:action})})});if(!r.ok)throw new Error();await refresh();}catch{setMessage("تعذر تحديث المفتاح");}finally{setBusy(false);}}
+ return <div className="space-y-6">
+  <section className="panel space-y-4"><div><h2 className="text-xl font-semibold">إدارة المزوّدين ومهام الإنتاج</h2><p className="muted mt-1 text-sm">رمز الإدارة: ADMIN_API_TOKEN أو MCP_AUTH_TOKEN. لا تشاركه.</p></div><div className="flex flex-col gap-2 sm:flex-row"><input className="field min-w-0 flex-1" type="password" placeholder="رمز الإدارة" value={token} onChange={e=>setToken(e.target.value)}/><button className="action" onClick={refresh} disabled={busy}>تحديث البيانات</button></div>{message&&<p className="text-sm text-cyan-200">{message}</p>}</section>
+  <section className="panel space-y-4"><h2 className="text-xl font-semibold">إضافة مولّد صور جديد (OpenAI-compatible)</h2><p className="muted text-sm">يدعم واجهة POST /v1/images/generations. يجب أن يكون العنوان HTTPS. تُشفّر المفاتيح داخل Turso.</p><form onSubmit={saveProvider} className="grid gap-3 md:grid-cols-2"><input className="field" placeholder="اسم المزوّد" value={name} onChange={e=>setName(e.target.value)} required/><input className="field" placeholder="معرّف نموذج الصور" value={model} onChange={e=>setModel(e.target.value)} required/><input className="field md:col-span-2" type="url" placeholder="HTTPS Base URL مثال https://api.example.com" value={baseUrl} onChange={e=>setBaseUrl(e.target.value)} required/><input className="field md:col-span-2" type="password" autoComplete="new-password" placeholder="API Key" value={apiKey} onChange={e=>setApiKey(e.target.value)} required/><button className="action md:col-span-2" disabled={busy||!token||!apiKey}>حفظ المولّد</button></form>
+  {providers.length>0&&<div className="overflow-x-auto"><table className="w-full text-right text-sm"><thead><tr className="muted border-b border-slate-700"><th className="p-2">المزوّد</th><th className="p-2">النموذج</th><th className="p-2">الحالة</th><th className="p-2">إجراء</th></tr></thead><tbody>{providers.map(p=><tr key={p.id} className="border-b border-slate-800"><td className="p-2">{p.name}<div className="muted text-xs">{p.masked}</div></td><td className="p-2">{p.image_model}</td><td className="p-2">{p.enabled?"مفعّل":"معطّل"}</td><td className="p-2 flex gap-2"><button className="subaction" onClick={()=>providerAction(p.id,"toggle",!p.enabled)}>{p.enabled?"تعطيل":"تفعيل"}</button><button className="subaction danger" onClick={()=>providerAction(p.id,"delete")}>حذف</button></td></tr>)}</tbody></table></div>}</section>
+  <section className="panel space-y-4"><h2 className="text-xl font-semibold">مفاتيح Kie.ai وCometAPI</h2><form onSubmit={addKey} className="grid gap-3 md:grid-cols-2"><select className="field" value={provider} onChange={e=>setProvider(e.target.value)}><option value="kie">Kie.ai</option><option value="cometapi">CometAPI</option></select><input className="field" placeholder="اسم وصفي" value={label} onChange={e=>setLabel(e.target.value)}/><input className="field md:col-span-2" type="password" placeholder="API Key" value={secret} onChange={e=>setSecret(e.target.value)} required/><button className="action md:col-span-2" disabled={busy||!token}>حفظ المفتاح</button></form>
+  <div className="overflow-x-auto"><table className="w-full text-right text-sm"><thead><tr className="muted"><th className="p-2">المزوّد</th><th className="p-2">الاسم/المفتاح</th><th className="p-2">الحالة</th><th className="p-2">إجراء</th></tr></thead><tbody>{keys.map(k=><tr key={k.id} className="border-t border-slate-800"><td className="p-2">{k.provider}</td><td className="p-2">{k.label}<div className="muted text-xs">{k.masked}</div></td><td className="p-2">{k.status}</td><td className="p-2 flex gap-2"><button className="subaction" onClick={()=>keyAction(k.id,k.status==="active"?"disabled":"active")}>{k.status==="active"?"تعطيل":"تفعيل"}</button>{!k.id.startsWith("env-")&&<button className="subaction danger" onClick={()=>keyAction(k.id,"delete")}>حذف</button>}</td></tr>)}</tbody></table></div></section>
+  <section className="panel space-y-3"><h2 className="text-xl font-semibold">آخر المهام</h2><div className="overflow-x-auto"><table className="w-full text-right text-sm"><thead><tr className="muted"><th className="p-2">Task ID</th><th className="p-2">النوع</th><th className="p-2">الحالة</th><th className="p-2">المزوّد</th></tr></thead><tbody>{tasks.map(t=><tr key={t.id} className="border-t border-slate-800"><td className="p-2 font-mono text-xs">{t.id.slice(0,12)}…</td><td className="p-2">{t.type}</td><td className="p-2">{t.status}</td><td className="p-2">{t.provider||"—"}</td></tr>)}</tbody></table></div></section>
+ </div>;
 }
