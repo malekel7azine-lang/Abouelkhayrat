@@ -126,3 +126,14 @@ curl -X DELETE https://YOUR-DOMAIN/api/jobs/JOB_ID
 - لا يوجد Render أو Vercel Blob أو S3 أو خدمة معالجة خارجية في مسار الدمج الحالي.
 
 المراجع الرسمية: [Vercel Function limits](https://vercel.com/docs/functions/limitations) · [Vercel duration](https://vercel.com/docs/functions/configuring-functions/duration) · [Turso pricing](https://turso.tech/pricing)
+
+
+## إدارة المزوّدين المخصصين من لوحة التطبيق
+
+يمكن إضافة مزوّد صور جديد من لوحة الإدارة دون إضافة API key إلى Vercel، بشرط أن يوفّر المزوّد واجهة متوافقة مع OpenAI Images API:
+- المسار المدعوم: `POST /v1/images/generations` (أو `/images/generations` إذا كان Base URL ينتهي بـ `/v1`).
+- أدخل اسم المزوّد، وHTTPS Base URL، ومعرّف نموذج الصور، وAPI Key من لوحة الإدارة.
+- تُشفّر المفاتيح باستخدام AES-256-GCM وتُحفظ في جدول `custom_providers` داخل Turso. لا تُعاد قيمة المفتاح إلى المتصفح.
+- يمكن تعطيل المزوّد أو حذفه من اللوحة. تُجرّب المزوّدات المخصصة بالترتيب قبل المزوّدات المدمجة.
+- هذا المسار العام يدعم توليد الصور المتوافق مع OpenAI فقط. واجهات الفيديو أو واجهات API الخاصة مثل Magic Hour تحتاج محولاً برمجياً مخصصاً قبل أن تعمل؛ إدخال المفتاح وحده لا يكفي.
+- احتفظ بقيمة `API_KEY_ENCRYPTION_SECRET` ثابتة في Vercel. إذا غُيّرت بعد تخزين المفاتيح، لن يمكن فك تشفير المفاتيح القديمة.
