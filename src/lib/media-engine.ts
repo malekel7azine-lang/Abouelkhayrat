@@ -5,6 +5,7 @@ import { createKieTask, getKieTask } from "@/lib/providers/kie";
 import { createCometImage, createCometVideo, getCometVideo } from "@/lib/providers/cometapi";
 import { createPollinationsImage, createPollinationsVideo, getPollinationsVideo } from "@/lib/providers/pollinations";
 import { tryCustomImageProviders } from "@/lib/custom-provider-engine";
+import { getActiveProviderSecret } from "@/lib/provider-keys";
 import { createInternalMergeJob, getInternalMergeStatus } from "@/lib/merge-store";
 import { processMerge } from "@/lib/merge-engine";
 
@@ -33,7 +34,7 @@ async function beginWithFallback(taskId: string, kind: "image" | "video", input:
           return;
         }
       }
-      if (provider === "pollinations" && (process.env.POLLINATIONS_KEY || process.env.Pollinations_key || process.env.POLLINATIONS_API_KEY)) {
+      if (provider === "pollinations" && await getActiveProviderSecret("pollinations")) {
         if (kind === "image") {
           const output = await createPollinationsImage(input);
           await updateTask(taskId, { status: "completed", provider: "pollinations", model: String(input.model || process.env.POLLINATIONS_IMAGE_MODEL || "black-forest-labs/flux.1-schnell"), result: { provider: "pollinations", output } });
