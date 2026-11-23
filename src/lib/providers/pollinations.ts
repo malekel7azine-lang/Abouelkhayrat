@@ -1,10 +1,11 @@
 import { ProviderError } from "@/lib/provider-errors";
+import { getActiveProviderSecret } from "@/lib/provider-keys";
 
 const BASE = "https://gen.pollinations.ai";
 
-function getKey(): string {
-  const key = process.env.POLLINATIONS_KEY || process.env.Pollinations_key || process.env.POLLINATIONS_API_KEY;
-  if (!key) throw new ProviderError("Pollinations key is not configured", "temporary");
+async function getKey(): Promise<string> {
+  const key = await getActiveProviderSecret("pollinations");
+  if (!key) throw new ProviderError("Pollinations key is not configured in the dashboard", "temporary");
   return key.trim();
 }
 
@@ -13,7 +14,7 @@ async function request(path: string, init: RequestInit = {}): Promise<Response> 
   try {
     response = await fetch(BASE + path, {
       ...init,
-      headers: { Authorization: "Bearer " + getKey(), ...(init.headers || {}) },
+      headers: { Authorization: "Bearer " + await getKey(), ...(init.headers || {}) },
       cache: "no-store"
     });
   } catch {
