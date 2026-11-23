@@ -6,6 +6,7 @@ import { createCometImage, createCometVideo, getCometVideo } from "@/lib/provide
 import { createPollinationsImage, createPollinationsVideo, getPollinationsVideo } from "@/lib/providers/pollinations";
 import { tryCustomImageProviders } from "@/lib/custom-provider-engine";
 import { getActiveProviderSecret } from "@/lib/provider-keys";
+import { createCustomVideoTask, getCustomVideoTask } from "@/lib/custom-video-engine";
 import { createInternalMergeJob, getInternalMergeStatus } from "@/lib/merge-store";
 import { processMerge } from "@/lib/merge-engine";
 
@@ -43,6 +44,13 @@ async function beginWithFallback(taskId: string, kind: "image" | "video", input:
         const created = await createPollinationsVideo(input);
         await updateTask(taskId, { status: "processing", provider: "pollinations", model: String(input.model || process.env.POLLINATIONS_VIDEO_MODEL || "google/veo-3.1-fast"), result: { provider: "pollinations", providerTaskId: created.taskId, retryAfter: Date.now() + 5000 } });
         return;
+      }
+      if (kind === "video" && provider === "pollinations") {
+        const custom = await createCustomVideoTask(input);
+        if (custom) {
+          await updateTask(taskId, { status: "processing", provider: custom.provider, model: String(input.model || "custom-video"), result: { provider: custom.provider, providerTaskId: custom.taskId, retryAfter: Date.now() + 5000 } });
+          return;
+        }
       }
       if (provider === "kie") {
         const created = await createKieTask(kind, input);
@@ -109,6 +117,11 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
     if (task.provider === "kie") status = await getKieTask(stored.providerTaskId, stored.providerKeyId);
     else if (task.provider === "cometapi") status = await getCometVideo(stored.providerTaskId);
     else if (task.provider === "pollinations") status = await getPollinationsVideo(stored.providerTaskId);
+    else if (task.provider && !["kie","cometapi","pollinations","merger"].includes(task.provider)) {
+      const custom = await getCustomVideoTask(task.provider, stored.providerTaskId);
+      if (!custom) return;
+      status = custom;
+    }
     else if (task.provider === "merger") { const internal = await getInternalMergeStatus(stored.providerTaskId); if (!internal) throw new ProviderError("Merge task not found", "fatal"); status = { state: internal.state, result: internal, error: internal.error }; }
     else return;
 
@@ -117,7 +130,7 @@ async function refreshRemote(task: TaskRecord, stored: StoredResult): Promise<vo
     } else if (terminalFailure(status.state)) {
       await updateTask(task.id, { status: "failed", errorCode: "PROVIDER_TASK_FAILED", result: { provider: task.provider, error: "Provider task failed" } });
     } else {
-      const pollDelay = task.provider === "cometapi" ? 10_000 : task.provider === "pollinations" ? 5_000 : task.provider === "merger" ? 5_000 : 3_000;
+      const pollDelay = task.provider === "cometapi" ? 10_000 : task.provider === "pollinations" ? 5_000 : task.provider === "merger" ? 5_000 : 5_000;
       await updateTask(task.id, { status: "processing", result: { ...stored, retryAfter: Date.now() + pollDelay } });
     }
   } catch (error) {
